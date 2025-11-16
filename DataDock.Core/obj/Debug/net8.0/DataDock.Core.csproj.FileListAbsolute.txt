@@ -1,0 +1,11 @@
+/home/dave/projects/datadock/DataDock.Core/bin/Debug/net8.0/DataDock.Core.deps.json
+/home/dave/projects/datadock/DataDock.Core/bin/Debug/net8.0/DataDock.Core.dll
+/home/dave/projects/datadock/DataDock.Core/bin/Debug/net8.0/DataDock.Core.pdb
+/home/dave/projects/datadock/DataDock.Core/obj/Debug/net8.0/DataDock.Core.GeneratedMSBuildEditorConfig.editorconfig
+/home/dave/projects/datadock/DataDock.Core/obj/Debug/net8.0/DataDock.Core.AssemblyInfoInputs.cache
+/home/dave/projects/datadock/DataDock.Core/obj/Debug/net8.0/DataDock.Core.AssemblyInfo.cs
+/home/dave/projects/datadock/DataDock.Core/obj/Debug/net8.0/DataDock.Core.csproj.CoreCompileInputs.cache
+/home/dave/projects/datadock/DataDock.Core/obj/Debug/net8.0/DataDock.Core.dll
+/home/dave/projects/datadock/DataDock.Core/obj/Debug/net8.0/refint/DataDock.Core.dll
+/home/dave/projects/datadock/DataDock.Core/obj/Debug/net8.0/DataDock.Core.pdb
+/home/dave/projects/datadock/DataDock.Core/obj/Debug/net8.0/ref/DataDock.Core.dll
