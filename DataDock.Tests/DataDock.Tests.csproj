@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\DataDock.Core\DataDock.Core.csproj" />
+    <ProjectReference Include="..\DataDock.Cli\DataDock.Cli.csproj" />
   </ItemGroup>
 
 </Project>

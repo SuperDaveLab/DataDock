@@ -3,6 +3,8 @@
   "tableName": "Tickets",
   "columnNameStyle": "SnakeCase",
   "strictRequiredFields": true,
+  "tableSchema": "dbo",
+  "keyFields": ["TicketId"],
   "targetFields": [
     {
       "name": "TicketId",

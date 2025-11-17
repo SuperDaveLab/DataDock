@@ -9,3 +9,5 @@
 /home/dave/projects/datadock/DataDock.Core/obj/Debug/net8.0/refint/DataDock.Core.dll
 /home/dave/projects/datadock/DataDock.Core/obj/Debug/net8.0/DataDock.Core.pdb
 /home/dave/projects/datadock/DataDock.Core/obj/Debug/net8.0/ref/DataDock.Core.dll
+/home/dave/projects/datadock/DataDock.Core/obj/Debug/net8.0/DataDock.Core.sourcelink.json
+/home/dave/projects/datadock/DataDock.Core/obj/Debug/net8.0/DataDock.Core.csproj.AssemblyReference.cache

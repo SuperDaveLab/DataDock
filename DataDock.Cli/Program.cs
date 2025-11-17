@@ -33,6 +33,7 @@ public class Program
     {
         try
         {
+            var appConfig = AppConfigLoader.Load();
             var options = ParseArgs(args);
             if (options == null)
             {
@@ -47,6 +48,7 @@ public class Program
 
             // 1. Load profile
             var profile = LoadProfile(options.ProfilePath);
+            var connectionSettings = ConnectionSettingsResolver.Resolve(options, profile, appConfig);
 
             // 2. Create appropriate reader based on file extension
             IDataSourceReader dataReader = CreateDataReader(options.InputPath);
@@ -134,48 +136,48 @@ public class Program
                             continue;
                         }
 
-                    var conversion = ValueConverter.Convert(field.FieldType, rawValue);
+                        var conversion = ValueConverter.Convert(field.FieldType, rawValue);
 
-                    if (!conversion.Success)
-                    {
-                        rowResult.Errors.Add(
-                            $"Field '{field.Name}': {conversion.ErrorMessage}");
-                        rowResult.Values[field.Name] = null;
-                    }
-                    else
-                    {
-                        var value = conversion.Value;
-
-                        // String max length enforcement
-                        if (field.FieldType == FieldType.String &&
-                            field.MaxLength.HasValue &&
-                            value is string s &&
-                            s.Length > field.MaxLength.Value)
+                        if (!conversion.Success)
                         {
                             rowResult.Errors.Add(
-                                $"Field '{field.Name}': string length {s.Length} exceeds max {field.MaxLength.Value}.");
-                            rowResult.Values[field.Name] = s.Substring(0, field.MaxLength.Value);
+                                $"Field '{field.Name}': {conversion.ErrorMessage}");
+                            rowResult.Values[field.Name] = null;
                         }
                         else
                         {
-                            rowResult.Values[field.Name] = value;
-                        }
+                            var value = conversion.Value;
 
-                        // Required check for empty
-                        if (field.IsRequired && profile.StrictRequiredFields)
-                        {
-                            if (value == null ||
-                                (value is string str && string.IsNullOrWhiteSpace(str)))
+                            if (field.FieldType == FieldType.String &&
+                                field.MaxLength.HasValue &&
+                                value is string s &&
+                                s.Length > field.MaxLength.Value)
                             {
                                 rowResult.Errors.Add(
-                                    $"Required field '{field.Name}' is empty.");
+                                    $"Field '{field.Name}': string length {s.Length} exceeds max {field.MaxLength.Value}.");
+                                rowResult.Values[field.Name] = s.Substring(0, field.MaxLength.Value);
+                            }
+                            else
+                            {
+                                rowResult.Values[field.Name] = value;
+                            }
+
+                            // Required check for empty
+                            if (field.IsRequired && profile.StrictRequiredFields)
+                            {
+                                if (value == null ||
+                                    (value is string str && string.IsNullOrWhiteSpace(str)))
+                                {
+                                    rowResult.Errors.Add(
+                                        $"Required field '{field.Name}' is empty.");
+                                }
                             }
                         }
                     }
-                }
 
                     rowResults.Add(rowResult);
                 }
+
 
                 // 6. Split valid and invalid rows
                 var validRows = rowResults.Where(r => r.IsValid).ToList();
@@ -217,6 +219,32 @@ public class Program
 
                 Console.WriteLine();
                 Console.WriteLine($"Wrote {validRows.Count} valid rows to: {options.OutputPath}");
+
+                // 8. Optionally write to SQL Server
+                if (options.WriteToDatabase)
+                {
+                    if (string.IsNullOrWhiteSpace(connectionSettings.ConnectionString))
+                    {
+                        Console.Error.WriteLine("No connection string found. Provide --connection-string, set profile.tableConnectionString, or configure datadock.config.json.");
+                        return 1;
+                    }
+
+                    var resolvedKeyFields = ResolveKeyFields(options, profile);
+
+                    if (options.WriteMode == WriteMode.Upsert && resolvedKeyFields.Count == 0)
+                    {
+                        Console.Error.WriteLine("Upsert mode requires at least one key field (via --key-fields or profile keyFields).");
+                        return 1;
+                    }
+
+                    Console.WriteLine();
+                    Console.WriteLine($"Writing {validRows.Count} rows to SQL Server using mode {options.WriteMode}...");
+
+                    var writer = new SqlServerDataWriter(profile, options.WriteMode, resolvedKeyFields, connectionSettings.Schema);
+                    writer.WriteRows(connectionSettings.ConnectionString!, validRows);
+
+                    Console.WriteLine("Database write completed.");
+                }
             } // end using dataReader
 
             return 0;
@@ -319,11 +347,29 @@ public class Program
 
     return profile;
 }
+
+    private static List<string> ResolveKeyFields(CliOptions options, ImportProfile profile)
+    {
+        var source = options.KeyFields.Count > 0
+            ? options.KeyFields
+            : profile.KeyFields;
+
+        return source
+            .Where(k => !string.IsNullOrWhiteSpace(k))
+            .Select(k => k.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
 private static CliOptions? ParseArgs(string[] args)
 {
     string? profile = null;
     string? input = null;
     string? output = null;
+    string? connectionString = null;
+    string? dbSchema = null;
+    var keyFields = new List<string>();
+    var writeMode = WriteMode.Insert;
+    var writeDb = false;
 
     for (int i = 0; i < args.Length; i++)
     {
@@ -338,6 +384,32 @@ private static CliOptions? ParseArgs(string[] args)
             case "--output" when i + 1 < args.Length:
                 output = args[++i];
                 break;
+            case "--write-mode" when i + 1 < args.Length:
+                var writeModeArg = args[++i];
+                if (!WriteModeParser.TryParse(writeModeArg, out writeMode))
+                {
+                    Console.Error.WriteLine($"Unknown write mode '{writeModeArg}'. Supported values: insert, truncate-insert, upsert.");
+                    return null;
+                }
+                break;
+            case "--key-fields" when i + 1 < args.Length:
+                var keysArg = args[++i];
+                keyFields.AddRange(
+                    keysArg
+                        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+                break;
+            case "--write-db":
+                writeDb = true;
+                break;
+            case "--connection-string" when i + 1 < args.Length:
+                connectionString = args[++i];
+                break;
+            case "--db-schema" when i + 1 < args.Length:
+                dbSchema = args[++i];
+                break;
+            default:
+                Console.Error.WriteLine($"Unknown argument '{args[i]}'.");
+                return null;
         }
     }
 
@@ -346,7 +418,6 @@ private static CliOptions? ParseArgs(string[] args)
         return null;
     }
 
-    // Default output: <input>.out.json
     if (string.IsNullOrWhiteSpace(output))
     {
         output = input + ".out.json";
@@ -356,7 +427,12 @@ private static CliOptions? ParseArgs(string[] args)
     {
         ProfilePath = profile,
         InputPath = input,
-        OutputPath = output
+        OutputPath = output,
+        ConnectionString = connectionString,
+        WriteMode = writeMode,
+        WriteToDatabase = writeDb,
+        KeyFields = keyFields,
+        DatabaseSchema = dbSchema
     };
 }
 
@@ -365,17 +441,21 @@ private static CliOptions? ParseArgs(string[] args)
     Console.WriteLine("Usage:");
     Console.WriteLine("  datadock --profile <profile.json> --input <data.csv|data.xlsx> [--output <output.json>]");
     Console.WriteLine("  datadock schemagen --profile <profile.json> [--dialect sqlserver|postgres|mysql] [--output <file.sql>]");
+    Console.WriteLine("Options:");
+    Console.WriteLine("  --write-mode insert|truncate-insert|upsert");
+    Console.WriteLine("  --key-fields Field1,Field2,...");
+    Console.WriteLine("  --write-db");
+    Console.WriteLine("  --connection-string <sql-connection-string>");
+    Console.WriteLine("  --db-schema <schema>");
+    Console.WriteLine();
+    Console.WriteLine("Global config:");
+    Console.WriteLine("  datadock.config.json (cwd), ~/.datadock/config.json, /etc/datadock/config.json");
+    Console.WriteLine("  Connection string priority: --connection-string > profile.tableConnectionString > config database.defaultConnectionString");
+    Console.WriteLine("  Schema priority: --db-schema > profile.tableSchema > config database.defaultSchema > dbo");
     Console.WriteLine();
     Console.WriteLine("Examples:");
     Console.WriteLine("  datadock --profile profiles/tickets.json --input samples/tickets.csv --output out/tickets.json");
     Console.WriteLine("  datadock --profile profiles/tickets.json --input samples/tickets.xlsx --output out/tickets.json");
     Console.WriteLine("  datadock schemagen --profile profiles/tickets.json --dialect sqlserver --output out/tickets.sql");
 }
-
-  private class CliOptions
-  {
-    public string ProfilePath { get; set; } = string.Empty;
-    public string InputPath { get; set; } = string.Empty;
-    public string? OutputPath { get; set; }
-  }
 }
