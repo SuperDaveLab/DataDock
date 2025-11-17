@@ -1,0 +1,46 @@
+# DataDock
+
+DataDock is a cross-platform data import utility for pushing CSV/XLSX data into relational databases (currently SQL Server).
+
+It’s designed to replace the fragile SSMS “Import Data…” wizard with something you can run from Linux, script, and eventually drive via a GUI.
+
+---
+
+## Features (current)
+
+- **CSV + Excel (XLSX) import** via CsvHelper + NPOI (no ACE/OLEDB).
+- **Profile-driven OR DB-driven schemas**:
+  - New tables: infer schema from file or define it in a profile.
+  - Existing tables: introspect DB schema and only use profile for behavior/aliases.
+- **Type conversion + validation**:
+  - Int/decimal/bool/datetime/string conversion with error reporting.
+- **String length inference with buckets**:
+  - Max observed length per column → bucketed into:
+    `50, 100, 255, 500, 1000, 2000, 3000, 4000`.
+- **SQL schema generation** (`schemagen`):
+  - Generate `CREATE TABLE` from profile.
+- **DB schema introspection**:
+  - Read existing table definitions from SQL Server.
+- **Write modes**:
+  - `insert` – plain appends.
+  - `truncate-insert` – clear table then insert.
+  - `upsert` – update/insert based on key fields.
+- **Configurable defaults**:
+  - Global config for DB connection, schema, column naming style, etc.
+  - Per-import overrides via profile or CLI flags.
+
+---
+
+## Prerequisites
+
+- [.NET 8 SDK](https://dotnet.microsoft.com/)
+- SQL Server (local or remote). For dev, a Docker container is fine, e.g.:
+
+  ```bash
+  docker run -e "ACCEPT_EULA=Y" \
+    -e "SA_PASSWORD=YourStrong!Passw0rd" \
+    -p 1433:1433 \
+    --name mssql-dev \
+    -d mcr.microsoft.com/mssql/server:2022-latest
+- A SQL client (sqlcmd, Azure Data Studio, DBeaver, etc.) to run the generated SQL
+
