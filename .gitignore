@@ -48,3 +48,8 @@ Thumbs.db
 *.mov
 *.wmv
 
+# .NET build artifacts
+bin/
+obj/
+out/
+
