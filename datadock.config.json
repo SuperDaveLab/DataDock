@@ -1,0 +1,10 @@
+{
+  "database": {
+    "defaultConnectionString": "Server=localhost;Database=DataDockDev;Trusted_Connection=true;",
+    "defaultSchema": "dbo"
+  },
+  "defaults": {
+    "columnNameStyle": "CamelCase",
+    "stringLengthStrategy": "MaxObservedRounded"
+  }
+}

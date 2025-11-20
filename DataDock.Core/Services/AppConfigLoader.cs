@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using DataDock.Core.Models;
 
 namespace DataDock.Core.Services;
@@ -7,7 +8,8 @@ public static class AppConfigLoader
 {
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
-        PropertyNameCaseInsensitive = true
+        PropertyNameCaseInsensitive = true,
+        Converters = { new JsonStringEnumConverter() }
     };
 
     public static AppConfig Load()
@@ -39,7 +41,10 @@ public static class AppConfigLoader
 
     private static IEnumerable<string> GetCandidatePaths()
     {
-        yield return Path.Combine(Directory.GetCurrentDirectory(), "datadock.config.json");
+        foreach (var path in EnumerateWorkingDirectoryAncestry())
+        {
+            yield return path;
+        }
 
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         if (!string.IsNullOrWhiteSpace(home))
@@ -48,5 +53,27 @@ public static class AppConfigLoader
         }
 
         yield return "/etc/datadock/config.json";
+    }
+
+    private static IEnumerable<string> EnumerateWorkingDirectoryAncestry()
+    {
+        var current = Directory.GetCurrentDirectory();
+        if (string.IsNullOrWhiteSpace(current))
+        {
+            yield break;
+        }
+
+        while (true)
+        {
+            yield return Path.Combine(current, "datadock.config.json");
+
+            var parent = Directory.GetParent(current);
+            if (parent == null)
+            {
+                yield break;
+            }
+
+            current = parent.FullName;
+        }
     }
 }

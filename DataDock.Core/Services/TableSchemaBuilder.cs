@@ -12,7 +12,8 @@ public static class TableSchemaBuilder
 
         var schema = new TableSchema
         {
-            TableName = profile.TableName
+            TableName = profile.TableName,
+            SchemaName = profile.TableSchema
         };
 
         foreach (var field in profile.TargetFields)

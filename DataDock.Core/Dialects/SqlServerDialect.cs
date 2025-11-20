@@ -1,3 +1,4 @@
+using System;
 using System.Text;
 using DataDock.Core.Interfaces;
 using DataDock.Core.Models;
@@ -9,7 +10,8 @@ public class SqlServerDialect : ISqlDialect
     public string GenerateCreateTable(TableSchema schema)
     {
         var sb = new StringBuilder();
-        sb.AppendLine($"CREATE TABLE [{schema.TableName}] (");
+    var qualifiedName = BuildQualifiedName(schema.SchemaName, schema.TableName);
+    sb.AppendLine($"CREATE TABLE {qualifiedName} (");
 
         for (int i = 0; i < schema.Columns.Count; i++)
         {
@@ -46,4 +48,25 @@ public class SqlServerDialect : ISqlDialect
             _                  => "VARCHAR(255)"
         };
     }
+
+        private static string BuildQualifiedName(string? schemaName, string tableName)
+        {
+            if (string.IsNullOrWhiteSpace(tableName))
+                throw new ArgumentException("Table name is required.", nameof(tableName));
+
+            var escapedTable = QuoteIdentifier(tableName);
+
+            if (string.IsNullOrWhiteSpace(schemaName))
+            {
+                return escapedTable;
+            }
+
+            return $"{QuoteIdentifier(schemaName)}.{escapedTable}";
+        }
+
+        private static string QuoteIdentifier(string identifier)
+        {
+            var escaped = identifier.Replace("]", "]]", StringComparison.Ordinal);
+            return $"[{escaped}]";
+        }
 }

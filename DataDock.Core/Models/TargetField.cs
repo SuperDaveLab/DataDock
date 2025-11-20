@@ -6,4 +6,7 @@ public class TargetField
     public FieldType FieldType { get; set; }           // e.g. String
     public bool IsRequired { get; set; }
     public int? MaxLength { get; set; }                // for string fields
+
+    // Optional explicit database column mapping
+    public string? DbColumnName { get; set; }
 }

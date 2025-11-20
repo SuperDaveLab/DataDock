@@ -46,7 +46,7 @@ public static class ColumnNameGenerator
     /// </summary>
     private static string NormalizeRawName(string name)
     {
-        var result = name.Trim().ToLowerInvariant();
+        var result = name.Trim();
 
         // Characters we want to *remove entirely*
         var removeChars = new[]
