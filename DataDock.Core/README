@@ -42,5 +42,167 @@ It’s designed to replace the fragile SSMS “Import Data…” wizard with som
     -p 1433:1433 \
     --name mssql-dev \
     -d mcr.microsoft.com/mssql/server:2022-latest
+  ```
 - A SQL client (sqlcmd, Azure Data Studio, DBeaver, etc.) to run the generated SQL
+
+### Build once
+
+```bash
+cd /home/dave/projects/datadock
+dotnet restore
+dotnet build
+```
+
+---
+
+## Configuration
+
+`datadock.config.json` controls defaults. The loader searches (nearest match wins): current directory → parent directories → `~/.datadock/config.json` → `/etc/datadock/config.json`.
+
+```json
+{
+  "database": {
+    "defaultConnectionString": "Server=localhost;Database=DataDockDev;Trusted_Connection=true;",
+    "defaultSchema": "dbo"
+  },
+  "defaults": {
+    "columnNameStyle": "CamelCase",
+    "stringLengthStrategy": "MaxObservedRounded"
+  }
+}
+```
+
+Precedence:
+
+- Connection string: `--connection-string` > `profile.tableConnectionString` > config default.
+- Schema: `--db-schema` > `profile.tableSchema` > config default > `dbo`.
+- Column style: `--column-style` > `profile.ColumnNameStyle` > config default.
+
+---
+
+## Command reference
+
+### Import (default)
+
+```
+datadock [--profile profile.json] --input <file> [--output out.json]
+         [--table TableName] [--column-style style]
+         [--write-db] [--ensure-table]
+         [--connection-string <sql-connection-string>]
+         [--db-schema schema]
+         [--write-mode insert|truncate-insert|upsert]
+         [--key-fields Field1,Field2]
+```
+
+Important flags:
+
+- `--input` (required) – CSV/XLSX source.
+- `--output` – JSON dump of valid rows (`<input>.out.json` by default).
+- `--profile` – optional profile that defines fields/aliases.
+- `--table` – override the inferred table name.
+- `--column-style` – `asis`, `camelcase`, `pascalcase`, `snakecase`, `titlewithspaces`.
+- `--write-db` – stream valid rows into SQL Server using the resolved connection string.
+- `--ensure-table` – create the table if it does not exist (uses inferred/profile schema).
+- `--write-mode` – `insert` (default), `truncate-insert`, `upsert`.
+- `--key-fields` – comma-separated list (required for `upsert`).
+
+### Schema generation (`schemagen`)
+
+```
+datadock schemagen [--profile profile.json]
+                   [--input data.csv|data.xlsx]
+                   --table TableName
+                   [--column-style style]
+                   [--output file.sql]
+                   [--dialect sqlserver]
+```
+
+If no profile is provided, `--input` is required so the schema can be inferred from file headers and sample data.
+
+---
+
+## Common workflows
+
+### 1. Workbook-first new table
+
+```bash
+# generate CREATE TABLE
+dotnet run --project DataDock.Cli -- schemagen \
+  --input ./samples/Test_Tickets.xlsx \
+  --table Test_Tickets \
+  --output out/test_tickets.sql
+
+# run the DDL (example: sqlcmd inside Docker)
+cat out/test_tickets.sql | docker exec -i mssql-dev \
+  /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P 'S3cret!' -d DataDockDev
+
+# import & write rows
+dotnet run --project DataDock.Cli -- \
+  --input ./samples/Test_Tickets.xlsx \
+  --output out/test_tickets.json \
+  --table Test_Tickets \
+  --write-db --ensure-table \
+  --connection-string 'Server=localhost;Database=DataDockDev;User Id=sa;Password=S3cret!;Encrypt=True;TrustServerCertificate=True;'
+```
+
+### 2. Re-import into an existing table
+
+Either run `TRUNCATE TABLE dbo.Test_Tickets;` manually or let the CLI do it:
+
+```bash
+dotnet run --project DataDock.Cli -- \
+  --input ./samples/Test_Tickets.xlsx \
+  --table Test_Tickets \
+  --write-db --write-mode truncate-insert \
+  --connection-string 'Server=localhost;Database=DataDockDev;User Id=sa;Password=S3cret!;Encrypt=True;TrustServerCertificate=True;'
+```
+
+### 3. Profile-driven / DB-first
+
+Profiles (see `profiles/tickets.json`) define fields, aliases, and key columns explicitly:
+
+```bash
+dotnet run --project DataDock.Cli -- \
+  --profile profiles/tickets.json \
+  --input ./samples/tickets.csv \
+  --output out/tickets.json \
+  --write-db --write-mode upsert \
+  --key-fields TicketId \
+  --connection-string 'Server=localhost;Database=DataDockDev;Trusted_Connection=true;'
+```
+
+---
+
+## Database writing details
+
+- `--write-db` only streams *valid* rows (those without conversion/validation errors).
+- `--ensure-table` checks `INFORMATION_SCHEMA.TABLES`; if missing, it uses the inferred/profile schema plus the resolved column naming style.
+- `--db-schema` overrides the schema for a single run; otherwise profile/config defaults apply.
+- `--write-mode truncate-insert` issues `TRUNCATE TABLE` first; `upsert` performs `UPDATE` + `INSERT` using the specified key fields.
+- Column names stay consistent between schemagen and writes because they use the same `ColumnNameGenerator`.
+- Validation summaries are printed so you can address max-length truncation and type conversion errors.
+
+---
+
+## Troubleshooting
+
+- **Connection strings containing `!`** – wrap them in single quotes or escape the `!` so Bash does not treat it as history expansion.
+- **TLS / certificates** – local containers generally need `Encrypt=True;TrustServerCertificate=True;`.
+- **`sqlcmd` binary inside the container** – recent SQL Server images ship it at `/opt/mssql-tools18/bin/sqlcmd`.
+- **Check row counts**:
+  ```bash
+  docker exec mssql-dev /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P 'S3cret!' \
+    -d DataDockDev -Q "SELECT COUNT(*) AS TotalRows FROM dbo.Test_Tickets;"
+  ```
+- **String length warnings** – bump the target field `maxLength` (via profile) or accept truncation; affected rows stay out of DB writes until fixed.
+
+---
+
+## Roadmap
+
+- GUI shell on top of these workflows
+- Additional SQL dialects (Postgres/MySQL)
+- Richer inference (better precision/scale, smarter length heuristics)
+
+Feedback is welcome as the tool evolves.
 
