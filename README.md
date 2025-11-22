@@ -10,6 +10,13 @@ A .NET 8 CLI that converts CSV/XLSX workbooks into ready-to-load SQL Server tabl
 - Configurable global defaults via `datadock.config.json`
 - Tested against SQL Server (local or containerized)
 
+### Why not SSMS?
+
+If you have ever tried to import Excel data with the SQL Server Import/Export Wizard and hit the dreaded
+`The 'Microsoft.ACE.OLEDB.16.0' provider is not registered on the local machine` error (or any of the ACE/OLEDB provider
+warnings), DataDock is the answer. The CLI uses `Microsoft.Data.SqlClient` plus CsvHelper/NPOI, so it never relies on the
+missing ACE/OLEDB driver or the SSIS runtime. No 32-bit providers, no Access Database Engine installs—just .NET 8 and SQL Server.
+
 Full CLI documentation lives in [`DataDock.Core/README`](DataDock.Core/README).
 
 ## Quick start
