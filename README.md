@@ -65,4 +65,4 @@ If DataDock saves you time, consider tossing a small donation so development kee
 
 - **GitHub Sponsors:** sponsor profile is in the works.
 - **Buy Me a Coffee / Ko-fi:** link a page of your choice and we’ll promote it alongside the releases.
-- **BTC:** `bc1qv5jguu4kcfqfgde6aely2n2cs5zkkv4v6g5ma8`
+- **BTC:** bc1qv5jguu4kcfqfgde6aely2n2cs5zkkv4v6g5ma8
