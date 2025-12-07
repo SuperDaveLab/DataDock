@@ -248,6 +248,23 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void OnTestConnectionClicked(object? sender, RoutedEventArgs e)
+    {
+        if (ViewModel is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await ViewModel.TestConnectionAsync();
+        }
+        catch (Exception ex)
+        {
+            ViewModel.SetStatus($"Connection test failed: {ex.Message}");
+        }
+    }
+
     private async void OnPreviewCreateTableClicked(object? sender, RoutedEventArgs e)
     {
         if (ViewModel is null)

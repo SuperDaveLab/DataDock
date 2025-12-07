@@ -499,6 +499,33 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
+    public async Task<bool> TestConnectionAsync()
+    {
+        if (!TryBuildConnectionString(out var connectionString, out var error))
+        {
+            StatusMessage = error ?? "Connection settings are incomplete.";
+            return false;
+        }
+
+        SetBusy(true, "Testing SQL connection...");
+        try
+        {
+            await using var connection = new SqlConnection(connectionString);
+            await connection.OpenAsync();
+            StatusMessage = $"Connected to {DatabaseName} @ {DatabaseHost}.";
+            return true;
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Connection failed: {ex.Message}";
+            return false;
+        }
+        finally
+        {
+            SetBusy(false);
+        }
+    }
+
     private void PublishImportIssues(ImportExecutionResult result)
     {
         if (result.InvalidRows <= 0)

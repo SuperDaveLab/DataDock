@@ -239,7 +239,7 @@
 
                                     <Border Grid.Column="1"
                                         x:Name="ActionsPanel"
-                                        Height="900"
+                                        Height="940"
                                         Background="#F8FAFF"
                                         CornerRadius="12"
                                         Padding="16"
@@ -287,6 +287,10 @@
 
                                             <CheckBox Content="Trust server certificate"
                                                       IsChecked="{Binding TrustServerCertificate}" />
+
+                                                <Button Content="Test Connection"
+                                                    Click="OnTestConnectionClicked"
+                                                    IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBooleanConverter}}" />
                                         </StackPanel>
 
                                         <StackPanel Spacing="8">
