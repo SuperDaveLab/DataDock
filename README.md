@@ -56,3 +56,13 @@ Pull requests and issues are welcome! See [`CONTRIBUTING.md`](CONTRIBUTING.md) f
 ## License
 
 Released under the [MIT License](LICENSE).
+
+---
+
+## Support & sponsorship
+
+If DataDock saves you time, consider tossing a small donation so development keeps rolling:
+
+- **GitHub Sponsors:** sponsor profile is in the works.
+- **Buy Me a Coffee / Ko-fi:** link a page of your choice and we’ll promote it alongside the releases.
+- **BTC:** `bc1qv5jguu4kcfqfgde6aely2n2cs5zkkv4v6g5ma8`
