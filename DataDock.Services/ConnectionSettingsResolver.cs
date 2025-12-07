@@ -1,11 +1,11 @@
 using DataDock.Core.Models;
 
-namespace DataDock.Cli;
+namespace DataDock.Services;
 
-internal static class ConnectionSettingsResolver
+public static class ConnectionSettingsResolver
 {
     public static ConnectionSettings Resolve(
-        CliOptions options,
+        ImportOptions options,
         ImportProfile profile,
         AppConfig appConfig)
     {
@@ -41,4 +41,4 @@ internal static class ConnectionSettingsResolver
     }
 }
 
-internal sealed record ConnectionSettings(string? ConnectionString, string Schema);
+public sealed record ConnectionSettings(string? ConnectionString, string Schema);

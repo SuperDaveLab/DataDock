@@ -1,5 +1,6 @@
 using DataDock.Cli;
 using DataDock.Core.Models;
+using DataDock.Services;
 
 namespace DataDock.Tests;
 

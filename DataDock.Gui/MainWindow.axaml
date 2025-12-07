@@ -1,0 +1,344 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:DataDock.Gui.ViewModels"
+        xmlns:models="using:DataDock.Gui.Models"
+        xmlns:conv="using:DataDock.Gui.Converters"
+        mc:Ignorable="d"
+        d:DesignWidth="1200"
+        d:DesignHeight="750"
+        x:Class="DataDock.Gui.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+    Title="DataDock"
+    DragDrop.AllowDrop="True">
+    <Window.DataContext>
+        <vm:MainWindowViewModel />
+    </Window.DataContext>
+
+    <Window.Resources>
+        <conv:InverseBooleanConverter x:Key="InverseBooleanConverter" />
+        <conv:NullableIntToStringConverter x:Key="NullableIntConverter" />
+        <conv:HeightDifferenceConverter x:Key="HeightDifferenceConverter" />
+    </Window.Resources>
+
+    <Window.Styles>
+        <Style Selector="Border.dropzone">
+            <Setter Property="Background" Value="#F8FAFC" />
+            <Setter Property="BorderBrush" Value="#D5DEFB" />
+            <Setter Property="BorderThickness" Value="2" />
+            <Setter Property="CornerRadius" Value="16" />
+            <Setter Property="Padding" Value="32" />
+        </Style>
+        <Style Selector="Border.dropzone.drag-over">
+            <Setter Property="BorderBrush" Value="#2563EB" />
+            <Setter Property="Background" Value="#EEF2FF" />
+        </Style>
+    </Window.Styles>
+
+    <Border Background="#EEF2FF">
+        <ScrollViewer Margin="24"
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto"
+                      DragDrop.AllowDrop="True">
+            <Grid ColumnDefinitions="360,32,*"
+                  Margin="16,8,16,24"
+                  VerticalAlignment="Top"
+                  DragDrop.AllowDrop="True">
+                <StackPanel Grid.Column="0" Spacing="16">
+                    <TextBlock Text="Drop a data file" FontSize="26" FontWeight="SemiBold" Foreground="#0F172A" />
+                    <TextBlock Text="CSV or Excel files"
+                               Foreground="#475569"
+                               Margin="0,0,0,8" />
+
+                    <Border x:Name="DropZoneBorder"
+                            Classes="dropzone"
+                            DragDrop.AllowDrop="True"
+                            DragDrop.Drop="OnDropZoneDrop"
+                            DragDrop.DragEnter="OnDropZoneDragEnter"
+                            DragDrop.DragLeave="OnDropZoneDragLeave"
+                            DragDrop.DragOver="OnDropZoneDragOver">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
+                            <TextBlock Text="Drag &amp; Drop"
+                                       FontSize="18"
+                                       FontWeight="SemiBold"
+                                       HorizontalAlignment="Center" />
+                            <TextBlock Text="Drop a .csv or .xlsx file, or browse to select"
+                                       Foreground="#64748B"
+                                       HorizontalAlignment="Center" />
+                            <Button Content="Browse Files"
+                                    Width="140"
+                                    HorizontalAlignment="Center"
+                                    Click="OnBrowseFileClicked" />
+                        </StackPanel>
+                    </Border>
+
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Selected file" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding SelectedFileName}" FontSize="14" />
+                        <TextBlock Text="{Binding SelectedFileDisplay}"
+                                   FontSize="12"
+                                   Foreground="#94A3B8"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Preview summary" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding PreviewSummary}" Foreground="#475569" />
+                    </StackPanel>
+
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Status" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding StatusMessage}" Foreground="#475569" />
+                    </StackPanel>
+
+                    <StackPanel Spacing="4" IsVisible="{Binding HasImportProgress}">
+                        <TextBlock Text="Import progress" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding ImportProgressMessage}"
+                                   Foreground="#475569"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <StackPanel Spacing="4" IsVisible="{Binding HasImportIssues}">
+                        <TextBlock Text="Import issues" FontWeight="SemiBold" />
+                        <ItemsControl ItemsSource="{Binding ImportIssues}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}"
+                                               TextWrapping="Wrap"
+                                               Foreground="#B45309"
+                                               Margin="0,0,0,4" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </StackPanel>
+
+                <Border Grid.Column="2" Background="White" CornerRadius="20" Padding="28">
+                    <Grid RowDefinitions="Auto,*,Auto">
+                        <ProgressBar Grid.Row="0"
+                                     Height="4"
+                                     Margin="0,0,0,16"
+                                     Minimum="0"
+                                     Maximum="100"
+                                     IsIndeterminate="True"
+                                     IsVisible="{Binding IsBusy}" />
+
+                        <Grid Grid.Row="1" ColumnDefinitions="*,320" ColumnSpacing="24">
+                            <Grid RowDefinitions="Auto,*">
+                                <StackPanel x:Name="SchemaHeaderPanel"
+                                            Grid.Row="0"
+                                            Spacing="8"
+                                            Margin="0,0,0,12">
+                                    <TextBlock Text="Schema preview" FontSize="24" FontWeight="SemiBold" />
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Text="{Binding PreviewSummary}" Foreground="#475569" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                            <TextBlock Text="Naming" Foreground="#475569" VerticalAlignment="Center" />
+                                            <ComboBox ItemsSource="{Binding ColumnStyles}"
+                                                      SelectedItem="{Binding SelectedColumnStyle}"
+                                                      MinWidth="180">
+                                                <ComboBox.ItemTemplate>
+                                                    <DataTemplate x:DataType="models:ColumnStyleOption">
+                                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                                            <TextBlock Text="{Binding Label}" />
+                                                            <TextBlock Text="{Binding Example}"
+                                                                       Foreground="#94A3B8" />
+                                                        </StackPanel>
+                                                    </DataTemplate>
+                                                </ComboBox.ItemTemplate>
+                                            </ComboBox>
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+
+                                <Grid Grid.Row="1">
+                                    <Grid RowDefinitions="Auto,*" IsVisible="{Binding HasPreview}">
+                                        <Grid ColumnDefinitions="Auto,*,*,120,90,80" ColumnSpacing="12" Margin="0,0,0,8">
+                                            <TextBlock Text="Include" FontWeight="SemiBold" />
+                                            <TextBlock Grid.Column="1" Text="Original" FontWeight="SemiBold" />
+                                            <TextBlock Grid.Column="2" Text="Proposed name" FontWeight="SemiBold" />
+                                            <TextBlock Grid.Column="3" Text="Data type" FontWeight="SemiBold" HorizontalAlignment="Right" />
+                                            <TextBlock Grid.Column="4" Text="Max length" FontWeight="SemiBold" HorizontalAlignment="Right" />
+                                            <TextBlock Grid.Column="5" Text="Allow null?" FontWeight="SemiBold" HorizontalAlignment="Right" />
+                                        </Grid>
+                                        <Border Grid.Row="1" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="12" Padding="0">
+                                            <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                                                          VerticalAlignment="Top">
+                                                <ScrollViewer.MaxHeight>
+                                                    <MultiBinding Converter="{StaticResource HeightDifferenceConverter}" ConverterParameter="32">
+                                                        <Binding Path="#ActionsPanel.Bounds.Height" />
+                                                        <Binding Path="#SchemaHeaderPanel.Bounds.Height" />
+                                                    </MultiBinding>
+                                                </ScrollViewer.MaxHeight>
+                                                <ItemsControl ItemsSource="{Binding FieldPreviews}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate x:DataType="models:FieldPreview">
+                                                            <Border Padding="16" Background="#FFFFFF" BorderBrush="#F1F5F9" BorderThickness="0,0,0,1">
+                                                                <Grid ColumnDefinitions="Auto,*,*,120,90,80" ColumnSpacing="12">
+                                                                    <CheckBox IsChecked="{Binding IsSelected}"
+                                                                              HorizontalAlignment="Center"
+                                                                              VerticalAlignment="Center" />
+                                                                    <TextBlock Grid.Column="1" Text="{Binding SourceName}" />
+                                                                    <TextBox Grid.Column="2"
+                                                                             Text="{Binding DisplayName, UpdateSourceTrigger=PropertyChanged}"
+                                                                             FontWeight="SemiBold"
+                                                                             BorderBrush="#CBD5F5"
+                                                                             BorderThickness="0,0,0,1"
+                                                                             Padding="0,0,0,4"
+                                                                             Background="Transparent" />
+                                                                    <ComboBox Grid.Column="3"
+                                                                              ItemsSource="{Binding $parent[Window].DataContext.FieldTypeOptions}"
+                                                                              SelectedItem="{Binding FieldType, Mode=TwoWay}"
+                                                                              HorizontalAlignment="Stretch"
+                                                                              Foreground="#475569"
+                                                                              MinWidth="110">
+                                                                        <ComboBox.ItemTemplate>
+                                                                            <DataTemplate>
+                                                                                <TextBlock Text="{Binding}" />
+                                                                            </DataTemplate>
+                                                                        </ComboBox.ItemTemplate>
+                                                                    </ComboBox>
+                                                                    <TextBox Grid.Column="4"
+                                                                             Text="{Binding MaxLength, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource NullableIntConverter}}"
+                                                                             HorizontalContentAlignment="Right"
+                                                                             BorderBrush="#CBD5F5"
+                                                                             BorderThickness="0,0,0,1"
+                                                                             Padding="0,0,0,4"
+                                                                             Background="Transparent"
+                                                                             Watermark="auto"
+                                                                             IsEnabled="{Binding RequiresLength}" />
+                                                                    <CheckBox Grid.Column="5"
+                                                                              Content="{x:Null}"
+                                                                              IsChecked="{Binding AllowsNull}"
+                                                                              HorizontalAlignment="Right"
+                                                                              VerticalAlignment="Center" />
+                                                                </Grid>
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <StackPanel />
+                                                        </ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                </ItemsControl>
+                                            </ScrollViewer>
+                                        </Border>
+                                    </Grid>
+
+                                    <StackPanel HorizontalAlignment="Center"
+                                                VerticalAlignment="Center"
+                                                Spacing="8"
+                                                Classes="preview-placeholder"
+                                                IsVisible="{Binding HasPreview, Converter={StaticResource InverseBooleanConverter}}">
+                                        <TextBlock Text="Drop a file to generate a schema preview" Foreground="#94A3B8" />
+                                    </StackPanel>
+                                </Grid>
+                            </Grid>
+
+                                    <Border Grid.Column="1"
+                                        x:Name="ActionsPanel"
+                                        Height="900"
+                                        Background="#F8FAFF"
+                                        CornerRadius="12"
+                                        Padding="16"
+                                        BorderBrush="#E2E8F0"
+                                        BorderThickness="1"
+                                        VerticalAlignment="Top">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <StackPanel Spacing="16">
+                                        <TextBlock Text="Export &amp; Database Actions"
+                                                   FontSize="20"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="#0F172A" />
+                                        <StackPanel Spacing="8">
+                                            <TextBlock Text="Table name" FontWeight="SemiBold" />
+                                            <TextBox Text="{Binding TableName, UpdateSourceTrigger=PropertyChanged}" />
+
+                                            <TextBlock Text="Schema" FontWeight="SemiBold" />
+                                            <TextBox Text="{Binding DatabaseSchema, UpdateSourceTrigger=PropertyChanged}" />
+
+                                            <TextBlock Text="Server host &amp; port" FontWeight="SemiBold" />
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                                <TextBox Text="{Binding DatabaseHost, UpdateSourceTrigger=PropertyChanged}"
+                                                         Watermark="hostname" />
+                                                <TextBox Grid.Column="1"
+                                                         Width="90"
+                                                         Text="{Binding DatabasePort, UpdateSourceTrigger=PropertyChanged}"
+                                                         HorizontalContentAlignment="Center" />
+                                            </Grid>
+
+                                            <TextBlock Text="Database name" FontWeight="SemiBold" />
+                                            <TextBox Text="{Binding DatabaseName, UpdateSourceTrigger=PropertyChanged}" />
+
+                                            <CheckBox Content="Use Windows / Integrated security"
+                                                      IsChecked="{Binding UseIntegratedSecurity}" />
+
+                                            <TextBlock Text="SQL username" FontWeight="SemiBold" />
+                                            <TextBox Text="{Binding DatabaseUser, UpdateSourceTrigger=PropertyChanged}"
+                                                     IsEnabled="{Binding UseIntegratedSecurity, Converter={StaticResource InverseBooleanConverter}}"
+                                                     Watermark="e.g. sa" />
+
+                                            <TextBlock Text="SQL password" FontWeight="SemiBold" />
+                                            <TextBox Text="{Binding DatabasePassword, UpdateSourceTrigger=PropertyChanged}"
+                                                     PasswordChar="*"
+                                                     IsEnabled="{Binding UseIntegratedSecurity, Converter={StaticResource InverseBooleanConverter}}" />
+
+                                            <CheckBox Content="Trust server certificate"
+                                                      IsChecked="{Binding TrustServerCertificate}" />
+                                        </StackPanel>
+
+                                        <StackPanel Spacing="8">
+                                            <TextBlock Text="Write mode" FontWeight="SemiBold" />
+                                            <ComboBox ItemsSource="{Binding WriteModeOptions}"
+                                                      SelectedItem="{Binding SelectedWriteMode}"
+                                                      MinWidth="160" />
+
+                                            <CheckBox Content="Create table before import"
+                                                      IsChecked="{Binding EnsureTableBeforeImport}"
+                                                      ToolTip.Tip="Ensures the table exists before inserting rows." />
+
+                                            <TextBlock Text="Preview/export scripts or push data into SQL Server using the buttons below."
+                                                       TextWrapping="Wrap"
+                                                       Foreground="#475569" />
+                                        </StackPanel>
+
+                                        <WrapPanel>
+                                            <Button Content="Preview CREATE TABLE"
+                                                    IsEnabled="{Binding CanGenerateOutputs}"
+                                                    Click="OnPreviewCreateTableClicked"
+                                                    Margin="0,0,8,8" />
+                                            <Button Content="Export CREATE TABLE..."
+                                                    IsEnabled="{Binding CanGenerateOutputs}"
+                                                    Click="OnExportCreateTableClicked"
+                                                    Margin="0,0,8,8" />
+                                            <Button Content="Preview JSON"
+                                                    IsEnabled="{Binding CanGenerateOutputs}"
+                                                    Click="OnPreviewJsonClicked"
+                                                    Margin="0,0,8,8" />
+                                            <Button Content="Export JSON..."
+                                                    IsEnabled="{Binding CanGenerateOutputs}"
+                                                    Click="OnExportJsonClicked"
+                                                    Margin="0,0,8,8" />
+                                            <Button Content="Create Table in DB"
+                                                    IsEnabled="{Binding CanRunDatabaseActions}"
+                                                    Click="OnCreateTableClicked"
+                                                    Margin="0,0,8,8" />
+                                            <Button Content="Import Data into DB"
+                                                    IsEnabled="{Binding CanRunDatabaseActions}"
+                                                    Click="OnImportDataClicked"
+                                                    Margin="0,0,8,8" />
+                                        </WrapPanel>
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </Border>
+                        </Grid>
+
+                        <Grid Grid.Row="2"/>
+                    </Grid>
+                </Border>
+            </Grid>
+        </ScrollViewer>
+    </Border>
+</Window>

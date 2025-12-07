@@ -3,17 +3,17 @@ using System.Globalization;
 using System.IO;
 using CsvHelper;
 
-namespace DataDock.Cli.DataSources;
+namespace DataDock.Services.DataSources;
 
 /// <summary>
-/// Wrapper for CsvHelper that implements IDataSourceReader
+/// Wrapper for CsvHelper that implements IDataSourceReader.
 /// </summary>
-public class CsvDataSourceReader : IDataSourceReader
+public sealed class CsvDataSourceReader : IDataSourceReader
 {
     private readonly StreamReader _streamReader;
     private readonly CsvReader _csvReader;
     private string[] _headers = Array.Empty<string>();
-    private bool _headersRead = false;
+    private bool _headersRead;
 
     public CsvDataSourceReader(string filePath)
     {
@@ -26,7 +26,9 @@ public class CsvDataSourceReader : IDataSourceReader
         if (!_headersRead)
         {
             if (!_csvReader.Read())
+            {
                 throw new InvalidOperationException("CSV file appears to be empty.");
+            }
 
             _csvReader.ReadHeader();
             _headers = _csvReader.HeaderRecord ?? Array.Empty<string>();
@@ -38,21 +40,19 @@ public class CsvDataSourceReader : IDataSourceReader
 
     public bool Read()
     {
-        // Ensure headers are read first
         if (!_headersRead)
+        {
             GetHeaders();
+        }
 
         return _csvReader.Read();
     }
 
-    public string? GetField(int index)
-    {
-        return _csvReader.GetField(index);
-    }
+    public string? GetField(int index) => _csvReader.GetField(index);
 
     public void Dispose()
     {
-        _csvReader?.Dispose();
-        _streamReader?.Dispose();
+        _csvReader.Dispose();
+        _streamReader.Dispose();
     }
 }

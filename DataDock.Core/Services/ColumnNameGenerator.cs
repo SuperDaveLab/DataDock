@@ -35,6 +35,7 @@ public static class ColumnNameGenerator
             ColumnNameStyle.CamelCase       => ToCamelCase(words),
             ColumnNameStyle.PascalCase      => ToPascalCase(words),
             ColumnNameStyle.SnakeCase       => ToSnakeCase(words),
+            ColumnNameStyle.KebabCase       => ToKebabCase(words),
             ColumnNameStyle.TitleWithSpaces => ToTitleWithSpaces(words),
             _                               => fieldName
         };
@@ -125,6 +126,9 @@ public static class ColumnNameGenerator
 
     private static string ToSnakeCase(List<string> words)
         => string.Join("_", words);
+
+    private static string ToKebabCase(List<string> words)
+        => string.Join("-", words);
 
     private static string ToTitleWithSpaces(List<string> words)
     {

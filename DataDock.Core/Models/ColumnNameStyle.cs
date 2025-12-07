@@ -6,5 +6,6 @@ public enum ColumnNameStyle
     CamelCase,
     PascalCase,
     SnakeCase,
+    KebabCase,
     TitleWithSpaces
 }

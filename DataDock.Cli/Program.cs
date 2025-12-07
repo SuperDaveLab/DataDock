@@ -2,11 +2,12 @@
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using DataDock.Cli.DataSources;
+using DataDock.Services.DataSources;
 using DataDock.Core.Dialects;
 using DataDock.Core.Interfaces;
 using DataDock.Core.Models;
 using DataDock.Core.Services;
+using DataDock.Services;
 using Microsoft.Data.SqlClient;
 
 namespace DataDock.Cli;
@@ -755,7 +756,7 @@ private static CliOptions? ParseArgs(string[] args)
     Console.WriteLine("  --connection-string <sql-connection-string>");
     Console.WriteLine("  --db-schema <schema>");
     Console.WriteLine("  --table <tableName> (defaults to input file name when omitted)");
-    Console.WriteLine("  --column-style asis|camelcase|pascalcase|snakecase|titlewithspaces");
+    Console.WriteLine("  --column-style asis|camelcase|pascalcase|snakecase|kebabcase|titlewithspaces");
     Console.WriteLine();
     Console.WriteLine("Global config:");
     Console.WriteLine("  datadock.config.json (cwd or parent directories), ~/.datadock/config.json, /etc/datadock/config.json");
