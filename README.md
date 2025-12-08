@@ -8,6 +8,8 @@ DataDock ships as:
 * **A command-line interface (CLI)** for automation, scripting, CI pipelines, and power users
 * **A shared Core library (DataDock.Core)** providing schema inference, validation, conversion, mapping, and SQL dialect implementations
 
+![DataDock GUI Screenshot](Screenshot_v0.1.1.png)
+
 ---
 
 ## ✨ Features
