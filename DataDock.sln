@@ -13,6 +13,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataDock.Gui", "DataDock.Gu
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataDock.Services", "DataDock.Services\DataDock.Services.csproj", "{FCD03EB7-21BB-43F0-AF4C-D09219F9D9F0}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{89C14920-1E5A-482A-85A9-B67A4EC77A37}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SchemaViz.Gui", "src\SchemaViz.Gui\SchemaViz.Gui.csproj", "{87CD81FB-6F9F-4F31-B29E-6FF2C66F1DF0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -42,5 +46,12 @@ Global
 		{FCD03EB7-21BB-43F0-AF4C-D09219F9D9F0}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{FCD03EB7-21BB-43F0-AF4C-D09219F9D9F0}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{FCD03EB7-21BB-43F0-AF4C-D09219F9D9F0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{87CD81FB-6F9F-4F31-B29E-6FF2C66F1DF0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{87CD81FB-6F9F-4F31-B29E-6FF2C66F1DF0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{87CD81FB-6F9F-4F31-B29E-6FF2C66F1DF0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{87CD81FB-6F9F-4F31-B29E-6FF2C66F1DF0}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{87CD81FB-6F9F-4F31-B29E-6FF2C66F1DF0} = {89C14920-1E5A-482A-85A9-B67A4EC77A37}
 	EndGlobalSection
 EndGlobal

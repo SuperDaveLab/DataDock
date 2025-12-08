@@ -1,0 +1,144 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:SchemaViz.Gui.ViewModels"
+        xmlns:models="using:SchemaViz.Gui.Models"
+        xmlns:views="clr-namespace:SchemaViz.Gui.Views"
+        mc:Ignorable="d"
+        x:Class="SchemaViz.Gui.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Width="1200"
+        Height="780"
+        Title="SchemaViz">
+
+  <Grid ColumnDefinitions="340,16,*" RowDefinitions="Auto,*">
+    <Border Grid.Column="0"
+            Grid.RowSpan="2"
+            Background="#F3F6FF"
+            Padding="20">
+      <ScrollViewer VerticalScrollBarVisibility="Auto"
+            Padding="0,0,8,0">
+        <StackPanel Spacing="16">
+          <StackPanel Spacing="4">
+            <TextBlock Text="Connection"
+                       FontSize="20"
+                       FontWeight="SemiBold" />
+            <TextBlock Text="Configure how SchemaViz connects to SQL Server."
+                       Foreground="#5E6882"
+                       TextWrapping="Wrap" />
+          </StackPanel>
+
+          <StackPanel Spacing="8">
+            <TextBlock Text="Schema" FontWeight="SemiBold" />
+            <TextBox Text="{Binding DatabaseSchema, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+            <TextBlock Text="Server host &amp; port" FontWeight="SemiBold" />
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+              <TextBox Text="{Binding DatabaseHost, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                       Watermark="hostname or host\instance" />
+              <TextBox Grid.Column="1"
+                       Width="90"
+                       Text="{Binding DatabasePort, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                       HorizontalContentAlignment="Center" />
+            </Grid>
+
+            <TextBlock Text="Database name" FontWeight="SemiBold" />
+            <TextBox Text="{Binding DatabaseName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+            <CheckBox Content="Use Windows / Integrated security"
+                      IsChecked="{Binding UseIntegratedSecurity, Mode=TwoWay}" />
+
+            <TextBlock Text="SQL username" FontWeight="SemiBold" />
+            <TextBox Text="{Binding DatabaseUser, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                     IsEnabled="{Binding IsSqlAuthEnabled}"
+                     Watermark="e.g. sa" />
+
+            <TextBlock Text="SQL password" FontWeight="SemiBold" />
+            <TextBox Text="{Binding DatabasePassword, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                     PasswordChar="*"
+                     IsEnabled="{Binding IsSqlAuthEnabled}" />
+
+            <CheckBox Content="Trust server certificate"
+                      IsChecked="{Binding TrustServerCertificate, Mode=TwoWay}" />
+
+            <Button Content="Test Connection"
+                    Click="OnTestConnectionClicked"
+                    IsEnabled="{Binding CanTestConnection}" />
+
+            <TextBlock Text="{Binding StatusMessage}"
+                       Foreground="#475569"
+                       TextWrapping="Wrap" />
+          </StackPanel>
+
+          <StackPanel Spacing="8">
+            <TextBlock Text="Tables"
+                       FontSize="18"
+                       FontWeight="SemiBold" />
+            <ListBox ItemsSource="{Binding Tables}"
+                     SelectedItem="{Binding SelectedTable, Mode=TwoWay}"
+                     Height="300">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="models:TableListItem">
+                  <StackPanel>
+                    <TextBlock Text="{Binding DisplayName}" />
+                    <TextBlock Text="{Binding RowCountDisplay}"
+                               Foreground="#6F7B99"
+                               FontSize="12" />
+                  </StackPanel>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+          </StackPanel>
+        </StackPanel>
+      </ScrollViewer>
+    </Border>
+
+    <Border Grid.Column="2"
+            Grid.RowSpan="2"
+            Padding="24"
+            Background="White"
+            CornerRadius="18">
+      <TabControl>
+        <TabItem Header="Table Details">
+          <Grid RowDefinitions="Auto,*,Auto" RowSpacing="16">
+            <StackPanel Orientation="Horizontal" Spacing="16">
+              <StackPanel>
+                <TextBlock Text="{Binding SelectedTableDisplay}"
+                           FontSize="24"
+                           FontWeight="SemiBold" />
+                <TextBlock Text="{Binding SelectedTableDetails}"
+                           Foreground="#6F7B99" />
+              </StackPanel>
+            </StackPanel>
+
+            <DataGrid Grid.Row="1"
+                      ItemsSource="{Binding Columns}"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      CanUserSortColumns="True">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Column"
+                                     Binding="{Binding Name}" />
+                <DataGridTextColumn Header="Type"
+                                     Binding="{Binding DataType}" />
+                <DataGridTextColumn Header="Length/Precision"
+                                     Binding="{Binding LengthDisplay}" />
+                <DataGridTextColumn Header="Nullable"
+                                     Binding="{Binding NullableDisplay}" />
+              </DataGrid.Columns>
+            </DataGrid>
+
+            <TextBlock Grid.Row="2"
+                       Text="{Binding TableHintMessage}"
+                       Foreground="#94A3B8"
+                       TextWrapping="Wrap" />
+          </Grid>
+        </TabItem>
+        <TabItem Header="Diagram">
+          <views:SchemaDiagramView DataContext="{Binding Diagram}" />
+        </TabItem>
+      </TabControl>
+    </Border>
+  </Grid>
+</Window>

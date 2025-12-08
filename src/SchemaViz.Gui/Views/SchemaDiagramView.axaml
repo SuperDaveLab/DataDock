@@ -1,0 +1,102 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:conv="clr-namespace:SchemaViz.Gui.Converters"
+             mc:Ignorable="d"
+             x:CompileBindings="False"
+             x:Class="SchemaViz.Gui.Views.SchemaDiagramView">
+
+  <UserControl.Resources>
+    <conv:NodeCenterConverter x:Key="NodeCenterConverter" />
+    <conv:TableSelectedBrushConverter x:Key="TableSelectedBrushConverter" />
+  </UserControl.Resources>
+
+  <Grid RowDefinitions="Auto,*">
+    <StackPanel Orientation="Horizontal" Margin="8" Spacing="8">
+      <TextBlock Text="Zoom:" VerticalAlignment="Center" />
+      <Slider Minimum="0.25" Maximum="3" Width="160" Value="{Binding Zoom}" />
+      <Button Content="Reset" Command="{Binding ResetViewCommand}" />
+    </StackPanel>
+
+    <Border Grid.Row="1" Background="#10131A" ClipToBounds="True">
+      <Grid x:Name="DiagramCanvas"
+            Background="Transparent"
+            PointerPressed="OnCanvasPointerPressed"
+            PointerMoved="OnCanvasPointerMoved"
+            PointerReleased="OnCanvasPointerReleased">
+        <Grid.RenderTransform>
+          <TransformGroup>
+            <ScaleTransform ScaleX="{Binding Zoom}" ScaleY="{Binding Zoom}" />
+            <TranslateTransform X="{Binding OffsetX}" Y="{Binding OffsetY}" />
+          </TransformGroup>
+        </Grid.RenderTransform>
+
+        <ItemsControl ItemsSource="{Binding Relationships}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <Canvas />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Line Stroke="#4B5563" StrokeThickness="1.5">
+                <Line.StartPoint>
+                  <MultiBinding Converter="{StaticResource NodeCenterConverter}">
+                    <Binding Path="From.CenterX" />
+                    <Binding Path="From.CenterY" />
+                  </MultiBinding>
+                </Line.StartPoint>
+                <Line.EndPoint>
+                  <MultiBinding Converter="{StaticResource NodeCenterConverter}">
+                    <Binding Path="To.CenterX" />
+                    <Binding Path="To.CenterY" />
+                  </MultiBinding>
+                </Line.EndPoint>
+              </Line>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <ItemsControl ItemsSource="{Binding Tables}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <Canvas />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemContainerTheme>
+            <ControlTheme TargetType="ContentPresenter">
+              <Setter Property="Canvas.Left" Value="{Binding X}" />
+              <Setter Property="Canvas.Top" Value="{Binding Y}" />
+            </ControlTheme>
+          </ItemsControl.ItemContainerTheme>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Border CornerRadius="6"
+                      Padding="8"
+                      Margin="4"
+                      Background="{Binding IsSelected, Converter={StaticResource TableSelectedBrushConverter}}"
+                      BorderBrush="#E2E8F0"
+                      BorderThickness="1"
+                      PointerPressed="OnNodePointerPressed"
+                      PointerMoved="OnNodePointerMoved"
+                      PointerReleased="OnNodePointerReleased"
+                      SizeChanged="OnNodeSizeChanged">
+                <StackPanel>
+                  <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" Foreground="White" />
+                  <ItemsControl ItemsSource="{Binding Columns}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <TextBlock Text="{Binding}" Foreground="#CBD5F5" FontSize="11" />
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </Grid>
+    </Border>
+  </Grid>
+</UserControl>
