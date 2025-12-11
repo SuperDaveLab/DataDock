@@ -1,0 +1,108 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+						 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+						 xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+						 xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+						 xmlns:conv="clr-namespace:SchemaViz.Gui.Converters"
+						 mc:Ignorable="d"
+						 x:CompileBindings="False"
+						 x:Class="SchemaViz.Gui.Views.SchemaDiagramView">
+
+	<UserControl.Resources>
+		<conv:NodeCenterConverter x:Key="NodeCenterConverter" />
+		<conv:TableSelectedBrushConverter x:Key="TableSelectedBrushConverter" />
+	</UserControl.Resources>
+
+	<Grid RowDefinitions="Auto,*">
+		<!-- Toolbar -->
+		<StackPanel Orientation="Horizontal"
+								Margin="8"
+								Spacing="8">
+			<TextBlock Text="Zoom:" VerticalAlignment="Center" />
+			<Slider Minimum="0.15"
+							Maximum="3"
+							Width="160"
+							Value="{Binding Zoom}" />
+			<Button Content="Reset"
+							Command="{Binding ResetViewCommand}" />
+		</StackPanel>
+
+		<!-- Viewport -->
+		<Border Grid.Row="1"
+						Background="#10131A"
+						ClipToBounds="True">
+			<Grid x:Name="DiagramViewport"
+						Background="Transparent"
+						PointerPressed="OnCanvasPointerPressed"
+						PointerMoved="OnCanvasPointerMoved"
+						PointerReleased="OnCanvasPointerReleased">
+
+				<Canvas x:Name="DiagramCanvas"
+								Width="4000"
+								Height="2500"
+								HorizontalAlignment="Left"
+								VerticalAlignment="Top"
+								RenderTransformOrigin="0,0"
+								Background="#1A1A1A">
+					<Canvas.RenderTransform>
+						<TransformGroup>
+							<ScaleTransform ScaleX="{Binding Zoom}"
+															ScaleY="{Binding Zoom}" />
+							<TranslateTransform X="{Binding OffsetX}"
+																	Y="{Binding OffsetY}" />
+						</TransformGroup>
+					</Canvas.RenderTransform>
+
+					<!-- Temporary demo content -->
+					<Rectangle Canvas.Left="200"
+										 Canvas.Top="200"
+										 Width="800"
+										 Height="400"
+										 Fill="#FF6B6B"
+										 Opacity="0.85"
+										 Stroke="#F1FAEE"
+										 StrokeThickness="2" />
+					<Ellipse Canvas.Left="1400"
+									 Canvas.Top="900"
+									 Width="600"
+									 Height="600"
+									 Fill="#4ECDC4"
+									 Stroke="#1D3557"
+									 StrokeThickness="3" />
+					<Rectangle Canvas.Left="2500"
+										 Canvas.Top="1500"
+										 Width="900"
+										 Height="500"
+										 Fill="#FFD166"
+										 Stroke="#473D5D"
+										 StrokeThickness="2" />
+					<Rectangle Canvas.Left="600"
+										 Canvas.Top="1700"
+										 Width="500"
+										 Height="700"
+										 Fill="#5E60CE"
+										 Stroke="#E0AAFF"
+										 StrokeThickness="2" />
+				</Canvas>
+
+				<!-- Debug overlay to confirm data presence -->
+				<Border Background="#00000088"
+								CornerRadius="4"
+								Padding="6"
+								Margin="8"
+								HorizontalAlignment="Left"
+								VerticalAlignment="Top"
+								IsHitTestVisible="False">
+					<StackPanel>
+						<TextBlock Text="Zoom demo"
+											 Foreground="White"
+											 FontWeight="Bold"
+											 FontSize="12" />
+						<TextBlock Text="Drag with right mouse button to pan."
+											 Foreground="#CBD5F5"
+											 FontSize="12" />
+					</StackPanel>
+				</Border>
+			</Grid>
+		</Border>
+	</Grid>
+</UserControl>

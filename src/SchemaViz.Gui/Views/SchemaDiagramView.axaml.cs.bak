@@ -1,6 +1,6 @@
 using System;
 using System.ComponentModel;
-using System.Linq;
+using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -12,8 +12,6 @@ namespace SchemaViz.Gui.Views;
 
 public partial class SchemaDiagramView : UserControl
 {
-	private const double ZoomStepFactor = 0.1;
-
 	private TableNodeViewModel? _draggingNode;
 	private Point _dragStartPointer;
 	private double _dragStartX;
@@ -28,9 +26,6 @@ public partial class SchemaDiagramView : UserControl
 	private double _lastOffsetX = 0.0;
 	private double _lastOffsetY = 0.0;
 	private SchemaDiagramViewModel? _attachedDiagram;
-	private bool _suppressDiagramEvents;
-	private bool _initialLayoutApplied;
-	private bool _initialViewportCentered;
 
 	public SchemaDiagramView()
 	{
@@ -93,7 +88,6 @@ public partial class SchemaDiagramView : UserControl
 		var deltaY = (current.Y - _dragStartPointer.Y) / Diagram.Zoom;
 		_draggingNode.X = _dragStartX + deltaX;
 		_draggingNode.Y = _dragStartY + deltaY;
-		UpdateCanvasSize();
 		e.Handled = true;
 	}
 
@@ -118,8 +112,6 @@ public partial class SchemaDiagramView : UserControl
 
 		node.Width = e.NewSize.Width;
 		node.Height = e.NewSize.Height;
-		UpdateCanvasSize();
-		EnsureInitialLayout();
 	}
 
 	private void OnCanvasPointerPressed(object? sender, PointerPressedEventArgs e)
@@ -165,67 +157,6 @@ public partial class SchemaDiagramView : UserControl
 		var clamped = ClampOffsetToBounds(newOffsetX, newOffsetY, Diagram.Zoom);
 		Diagram.OffsetX = clamped.X;
 		Diagram.OffsetY = clamped.Y;
-		e.Handled = true;
-	}
-
-	private void OnCanvasPointerWheelChanged(object? sender, PointerWheelEventArgs e)
-	{
-		if (Diagram is null || DiagramViewportElement is null || DiagramCanvasElement is null)
-		{
-			return;
-		}
-
-		var delta = e.Delta.Y;
-		if (Math.Abs(delta) < double.Epsilon)
-		{
-			return;
-		}
-
-		var oldZoom = Diagram.Zoom;
-		if (oldZoom <= 0)
-		{
-			return;
-		}
-
-		var zoomChange = 1.0 + (delta * ZoomStepFactor);
-		if (zoomChange < 0.1)
-		{
-			zoomChange = 0.1;
-		}
-
-		var newZoom = oldZoom * zoomChange;
-		var minZoom = SchemaDiagramViewModel.MinZoom;
-		var maxZoom = SchemaDiagramViewModel.MaxZoom;
-		newZoom = Math.Clamp(newZoom, minZoom, maxZoom);
-
-		if (Math.Abs(newZoom - oldZoom) < 0.0001)
-		{
-			return;
-		}
-
-		var viewportPos = e.GetPosition(DiagramViewportElement);
-		var worldX = (viewportPos.X - Diagram.OffsetX) / oldZoom;
-		var worldY = (viewportPos.Y - Diagram.OffsetY) / oldZoom;
-		var newOffsetX = viewportPos.X - worldX * newZoom;
-		var newOffsetY = viewportPos.Y - worldY * newZoom;
-
-		var clamped = ClampOffsetToBounds(newOffsetX, newOffsetY, newZoom);
-
-		_suppressDiagramEvents = true;
-		try
-		{
-			Diagram.Zoom = newZoom;
-			Diagram.OffsetX = clamped.X;
-			Diagram.OffsetY = clamped.Y;
-		}
-		finally
-		{
-			_suppressDiagramEvents = false;
-		}
-
-		_lastZoom = newZoom;
-		_lastOffsetX = clamped.X;
-		_lastOffsetY = clamped.Y;
 		e.Handled = true;
 	}
 
@@ -276,67 +207,6 @@ public partial class SchemaDiagramView : UserControl
 		}
 	}
 
-	private void UpdateCanvasSize()
-	{
-		if (Diagram is null)
-		{
-			return;
-		}
-
-		if (Diagram.Tables is null || Diagram.Tables.Count == 0)
-		{
-			var width = Math.Max(SchemaDiagramViewModel.MinCanvasWidth, Diagram.CanvasWidth);
-			var height = Math.Max(SchemaDiagramViewModel.MinCanvasHeight, Diagram.CanvasHeight);
-
-			_suppressDiagramEvents = true;
-			try
-			{
-				Diagram.CanvasWidth = width;
-				Diagram.CanvasHeight = height;
-			}
-			finally
-			{
-				_suppressDiagramEvents = false;
-			}
-
-			return;
-		}
-
-		double maxRight = 0;
-		double maxBottom = 0;
-
-		foreach (var table in Diagram.Tables)
-		{
-			var right = table.X + table.Width;
-			var bottom = table.Y + table.Height;
-
-			if (right > maxRight)
-			{
-				maxRight = right;
-			}
-
-			if (bottom > maxBottom)
-			{
-				maxBottom = bottom;
-			}
-		}
-
-		const double padding = 200;
-		var targetWidth = Math.Max(SchemaDiagramViewModel.MinCanvasWidth, maxRight + padding);
-		var targetHeight = Math.Max(SchemaDiagramViewModel.MinCanvasHeight, maxBottom + padding);
-
-		_suppressDiagramEvents = true;
-		try
-		{
-			Diagram.CanvasWidth = targetWidth;
-			Diagram.CanvasHeight = targetHeight;
-		}
-		finally
-		{
-			_suppressDiagramEvents = false;
-		}
-	}
-
 	private void OnCanvasPointerReleased(object? sender, PointerReleasedEventArgs e)
 	{
 		if (_isPanning)
@@ -371,6 +241,54 @@ public partial class SchemaDiagramView : UserControl
 		DiagramViewportElement.LayoutUpdated += OnViewportLayoutUpdated;
 	}
 
+	private void OnViewportLayoutUpdated(object? sender, EventArgs e)
+	{
+		if (Diagram is null || DiagramViewportElement is null || DiagramCanvasElement is null)
+		{
+			return;
+		}
+
+		// Only initialize once
+		DiagramViewportElement.LayoutUpdated -= OnViewportLayoutUpdated;
+
+		var viewportBounds = DiagramViewportElement.Bounds;
+		if (viewportBounds.Width <= 0 || viewportBounds.Height <= 0)
+		{
+			return;
+		}
+
+		var canvasWidth = DiagramCanvasElement.Width;
+		var canvasHeight = DiagramCanvasElement.Height;
+		var initialZoom = Diagram.Zoom;
+
+		// Calculate canvas size in screen space
+		var canvasScreenWidth = canvasWidth * initialZoom;
+		var canvasScreenHeight = canvasHeight * initialZoom;
+
+		// Center the canvas in the viewport
+		var initialOffsetX = (viewportBounds.Width - canvasScreenWidth) / 2.0;
+		var initialOffsetY = (viewportBounds.Height - canvasScreenHeight) / 2.0;
+
+		// Only set if not already initialized (avoid overwriting user's view)
+		if (Math.Abs(Diagram.OffsetX) < 0.1 &&
+			Math.Abs(Diagram.OffsetY) < 0.1 &&
+			Math.Abs(Diagram.Zoom - 1.0) < 0.1)
+		{
+			Diagram.PropertyChanged -= OnDiagramPropertyChanged;
+			try
+			{
+				Diagram.OffsetX = initialOffsetX;
+				Diagram.OffsetY = initialOffsetY;
+			}
+			finally
+			{
+				Diagram.PropertyChanged += OnDiagramPropertyChanged;
+			}
+
+			_lastOffsetX = initialOffsetX;
+			_lastOffsetY = initialOffsetY;
+		}
+	}
 
 	private void OnDataContextChanged(object? sender, EventArgs e)
 	{
@@ -395,101 +313,10 @@ public partial class SchemaDiagramView : UserControl
 		_lastOffsetX = diagram.OffsetX;
 		_lastOffsetY = diagram.OffsetY;
 		diagram.PropertyChanged += OnDiagramPropertyChanged;
-		_initialLayoutApplied = false;
-		_initialViewportCentered = false;
-		UpdateCanvasSize();
-		EnsureInitialLayout();
-	}
-
-	private void CenterViewportOnTables(bool force = false)
-	{
-		if (Diagram is null || DiagramViewportElement is null || DiagramCanvasElement is null)
-		{
-			return;
-		}
-
-		if (!force && _initialViewportCentered)
-		{
-			return;
-		}
-
-		if (Diagram.Tables.Count == 0)
-		{
-			return;
-		}
-
-		if (Diagram.Tables.Any(table => table.Width <= 0 || table.Height <= 0))
-		{
-			return;
-		}
-
-		var viewportBounds = DiagramViewportElement.Bounds;
-		if (viewportBounds.Width <= 0 || viewportBounds.Height <= 0)
-		{
-			return;
-		}
-
-		var zoom = Diagram.Zoom;
-		var minX = Diagram.Tables.Min(table => table.X);
-		var minY = Diagram.Tables.Min(table => table.Y);
-		var maxX = Diagram.Tables.Max(table => table.X + table.Width);
-		var maxY = Diagram.Tables.Max(table => table.Y + table.Height);
-
-		var worldCenterX = (minX + maxX) / 2.0;
-		var worldCenterY = (minY + maxY) / 2.0;
-		var viewportCenterX = viewportBounds.Width / 2.0;
-		var viewportCenterY = viewportBounds.Height / 2.0;
-
-		var desiredOffsetX = viewportCenterX - worldCenterX * zoom;
-		var desiredOffsetY = viewportCenterY - worldCenterY * zoom;
-		var clamped = ClampOffsetToBounds(desiredOffsetX, desiredOffsetY, zoom);
-
-		_suppressDiagramEvents = true;
-		try
-		{
-			Diagram.OffsetX = clamped.X;
-			Diagram.OffsetY = clamped.Y;
-		}
-		finally
-		{
-			_suppressDiagramEvents = false;
-		}
-
-		_lastOffsetX = Diagram.OffsetX;
-		_lastOffsetY = Diagram.OffsetY;
-		_initialViewportCentered = true;
-	}
-
-	private void EnsureInitialLayout()
-	{
-		if (_initialLayoutApplied || Diagram is null)
-		{
-			return;
-		}
-
-		if (Diagram.Tables.Count == 0)
-		{
-			return;
-		}
-
-		if (Diagram.Tables.Any(table => table.Width <= 0 || table.Height <= 0))
-		{
-			return;
-		}
-
-		Diagram.ApplyAutoLayout();
-		UpdateCanvasSize();
-		CenterViewportOnTables(force: true);
-		_initialLayoutApplied = true;
 	}
 
 	private void OnDiagramPropertyChanged(object? sender, PropertyChangedEventArgs e)
 	{
-		if (_suppressDiagramEvents)
-		{
-			return;
-		}
-
 		if (!ReferenceEquals(sender, _attachedDiagram) || DiagramViewportElement is null)
 		{
 			return;
@@ -560,7 +387,7 @@ public partial class SchemaDiagramView : UserControl
 			var clamped = ClampOffsetToBounds(newOffsetX, newOffsetY, newZoom);
 
 			// Update offset
-			_suppressDiagramEvents = true;
+			diagram.PropertyChanged -= OnDiagramPropertyChanged;
 			try
 			{
 				diagram.OffsetX = clamped.X;
@@ -568,7 +395,7 @@ public partial class SchemaDiagramView : UserControl
 			}
 			finally
 			{
-				_suppressDiagramEvents = false;
+				diagram.PropertyChanged += OnDiagramPropertyChanged;
 			}
 
 			_lastZoom = newZoom;
@@ -592,7 +419,7 @@ public partial class SchemaDiagramView : UserControl
 					Math.Abs(clamped.Y - _attachedDiagram.OffsetY) > 0.01)
 				{
 					// Offset was out of bounds, clamp it
-					_suppressDiagramEvents = true;
+					_attachedDiagram.PropertyChanged -= OnDiagramPropertyChanged;
 					try
 					{
 						_attachedDiagram.OffsetX = clamped.X;
@@ -600,7 +427,7 @@ public partial class SchemaDiagramView : UserControl
 					}
 					finally
 					{
-						_suppressDiagramEvents = false;
+						_attachedDiagram.PropertyChanged += OnDiagramPropertyChanged;
 					}
 				}
 
@@ -609,17 +436,5 @@ public partial class SchemaDiagramView : UserControl
 				_lastOffsetY = _attachedDiagram.OffsetY;
 			}
 		}
-	}
-
-	private void OnViewportLayoutUpdated(object? sender, EventArgs e)
-	{
-		if (DiagramViewportElement is null)
-		{
-			return;
-		}
-
-		// Only initialize once
-		DiagramViewportElement.LayoutUpdated -= OnViewportLayoutUpdated;
-		CenterViewportOnTables();
 	}
 }

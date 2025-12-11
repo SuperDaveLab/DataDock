@@ -6,10 +6,12 @@ using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
+using System.Windows.Input;
 using DataDock.Core.Models;
 using DataDock.Core.Services;
 using DataDock.Services;
 using Microsoft.Data.SqlClient;
+using SchemaViz.Gui.Commands;
 using SchemaViz.Gui.Models;
 using SchemaViz.Gui.Services;
 using SchemaViz.Gui.ViewModels.Diagram;
@@ -21,6 +23,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private const int DiagramTableLimit = 40;
     private readonly SchemaMetadataService _metadataService = new();
     private readonly ConnectionSettings _defaultSettings;
+    private readonly ConnectionProfileStore _profileStore = new();
+    private readonly RelayCommand _removeConnectionCommand;
     private string? _activeConnectionString;
 
     private string _databaseHost = "localhost";
@@ -36,19 +40,28 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private string _statusMessage = "Click Test Connection to load tables.";
     private TableListItem? _selectedTable;
     private int _tableLoadVersion;
+    private int _selectionSyncSuppressionCount;
+    private ConnectionProfile? _selectedConnection;
 
     public MainWindowViewModel()
     {
         Tables = new ObservableCollection<TableListItem>();
         Columns = new ObservableCollection<ColumnDisplay>();
+        SavedConnections = new ObservableCollection<ConnectionProfile>();
         Diagram = new SchemaDiagramViewModel();
+        Diagram.PropertyChanged += OnDiagramPropertyChanged;
 
         Tables.CollectionChanged += OnTablesChanged;
         Columns.CollectionChanged += OnColumnsChanged;
+        SavedConnections.CollectionChanged += OnSavedConnectionsChanged;
+
+        _removeConnectionCommand = new RelayCommand(_ => RemoveSelectedConnection(), _ => SelectedConnection is not null);
+        RemoveSelectedConnectionCommand = _removeConnectionCommand;
 
         var appConfig = AppConfigLoader.Load();
         _defaultSettings = ConnectionSettingsResolver.Resolve(new ImportOptions(), new ImportProfile(), appConfig);
         ApplyDefaults(_defaultSettings);
+        LoadSavedConnections();
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -57,7 +70,32 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     public ObservableCollection<ColumnDisplay> Columns { get; }
 
+    public ObservableCollection<ConnectionProfile> SavedConnections { get; }
+
     public SchemaDiagramViewModel Diagram { get; }
+
+    public ConnectionProfile? SelectedConnection
+    {
+        get => _selectedConnection;
+        set
+        {
+            if (!SetProperty(ref _selectedConnection, value))
+            {
+                return;
+            }
+
+            _removeConnectionCommand.RaiseCanExecuteChanged();
+
+            if (value is not null)
+            {
+                ApplyProfile(value);
+            }
+        }
+    }
+
+    public ICommand RemoveSelectedConnectionCommand { get; }
+
+    public bool HasSavedConnections => SavedConnections.Count > 0;
 
     public string DatabaseHost
     {
@@ -141,13 +179,20 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         get => _selectedTable;
         set
         {
-            if (SetProperty(ref _selectedTable, value))
+            if (!SetProperty(ref _selectedTable, value))
             {
-                _ = LoadSelectedTableAsync(value);
-                OnPropertyChanged(nameof(SelectedTableDisplay));
-                OnPropertyChanged(nameof(SelectedTableDetails));
-                OnPropertyChanged(nameof(TableHintMessage));
+                return;
             }
+
+            if (!IsSelectionSyncSuppressed)
+            {
+                WithSelectionSyncSuppressed(() => SyncDiagramSelectionFromList(value));
+            }
+
+            _ = LoadSelectedTableAsync(value);
+            OnPropertyChanged(nameof(SelectedTableDisplay));
+            OnPropertyChanged(nameof(SelectedTableDetails));
+            OnPropertyChanged(nameof(TableHintMessage));
         }
     }
 
@@ -236,6 +281,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             }
 
             StatusMessage = status;
+            SaveCurrentConnectionProfile();
         }
         catch (Exception ex)
         {
@@ -440,7 +486,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             {
                 var tableInfo = await _metadataService.GetTableSchemaAsync(connectionString, table.Schema, table.Name);
                 var columns = tableInfo.Columns
-                    .Select(column => $"{column.Name} : {BuildDataType(column)}");
+                    .Select(column => new TableColumnViewModel(column.Name, BuildDataType(column)));
                 nodes.Add(new TableNodeViewModel(table.Schema, table.Name, columns));
             }
             catch
@@ -458,10 +504,14 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             var foreignKeys = await _metadataService.GetForeignKeysAsync(connectionString, diagramSchemaFilter);
             foreach (var fk in foreignKeys)
             {
-                if (lookup.TryGetValue(BuildTableKey(fk.FromSchema, fk.FromTable), out var fromNode) &&
-                    lookup.TryGetValue(BuildTableKey(fk.ToSchema, fk.ToTable), out var toNode))
+                if (lookup.TryGetValue(BuildTableKey(fk.ToSchema, fk.ToTable), out var parentNode) &&
+                    lookup.TryGetValue(BuildTableKey(fk.FromSchema, fk.FromTable), out var childNode))
                 {
-                    relationships.Add(new RelationshipViewModel(fromNode, toNode, fk.ConstraintName));
+                    relationships.Add(new RelationshipViewModel(
+                        parentNode,
+                        childNode,
+                        fk.ConstraintName,
+                        fk.ColumnLinks.ToList()));
                 }
             }
         }
@@ -470,7 +520,222 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             // Relationships are optional; ignore failures for now.
         }
 
-        Diagram.LoadDiagram(nodes, relationships);
+        ApplyRelationshipColumnMetadata(relationships);
+
+        WithSelectionSyncSuppressed(() =>
+        {
+            Diagram.LoadDiagram(nodes, relationships);
+            SyncDiagramSelectionFromList(SelectedTable);
+        });
+    }
+
+    private static void ApplyRelationshipColumnMetadata(IEnumerable<RelationshipViewModel> relationships)
+    {
+        foreach (var relationship in relationships)
+        {
+            foreach (var link in relationship.ColumnLinks)
+            {
+                var parentColumn = relationship.From.FindColumn(link.FromColumn);
+                if (parentColumn is not null)
+                {
+                    parentColumn.IsPrimaryKey = true;
+                }
+
+                var childColumn = relationship.To.FindColumn(link.ToColumn);
+                if (childColumn is not null)
+                {
+                    childColumn.IsForeignKey = true;
+                }
+            }
+        }
+    }
+
+    private bool IsSelectionSyncSuppressed => _selectionSyncSuppressionCount > 0;
+
+    private void WithSelectionSyncSuppressed(Action action)
+    {
+        _selectionSyncSuppressionCount++;
+        try
+        {
+            action();
+        }
+        finally
+        {
+            _selectionSyncSuppressionCount--;
+        }
+    }
+
+    private void SyncDiagramSelectionFromList(TableListItem? table)
+    {
+        var node = table is null ? null : FindNodeForTable(table);
+        Diagram.SelectTable(node);
+    }
+
+    private TableNodeViewModel? FindNodeForTable(TableListItem table)
+    {
+        return Diagram.Tables.FirstOrDefault(node =>
+            string.Equals(node.Schema, table.Schema, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(node.Name, table.Name, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private TableListItem? FindTableForNode(TableNodeViewModel node)
+    {
+        return Tables.FirstOrDefault(table =>
+            string.Equals(table.Schema, node.Schema, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(table.Name, node.Name, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private void OnDiagramPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (!string.Equals(e.PropertyName, nameof(SchemaDiagramViewModel.SelectedTable), StringComparison.Ordinal) ||
+            sender is not SchemaDiagramViewModel diagram)
+        {
+            return;
+        }
+
+        if (IsSelectionSyncSuppressed)
+        {
+            return;
+        }
+
+        WithSelectionSyncSuppressed(() =>
+        {
+            var node = diagram.SelectedTable;
+            if (node is null)
+            {
+                SelectedTable = null;
+                return;
+            }
+
+            var matching = FindTableForNode(node);
+            if (matching is null)
+            {
+                SelectedTable = null;
+                return;
+            }
+
+            if (!ReferenceEquals(matching, SelectedTable))
+            {
+                SelectedTable = matching;
+            }
+        });
+    }
+
+    private void LoadSavedConnections()
+    {
+        var profiles = _profileStore.LoadProfiles();
+        if (profiles.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var profile in profiles)
+        {
+            SavedConnections.Add(profile);
+        }
+
+        OnPropertyChanged(nameof(HasSavedConnections));
+    }
+
+    private void OnSavedConnectionsChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        OnPropertyChanged(nameof(HasSavedConnections));
+    }
+
+    private void ApplyProfile(ConnectionProfile profile)
+    {
+        DatabaseSchema = profile.Schema;
+        DatabaseHost = profile.Host;
+        DatabasePort = profile.Port ?? string.Empty;
+        DatabaseName = profile.Database;
+        UseIntegratedSecurity = profile.UseIntegratedSecurity;
+        TrustServerCertificate = profile.TrustServerCertificate;
+    }
+
+    private void SaveCurrentConnectionProfile()
+    {
+        var profile = BuildCurrentProfile();
+        if (profile is null)
+        {
+            return;
+        }
+
+        var index = FindProfileIndex(profile);
+        if (index >= 0)
+        {
+            SavedConnections[index] = profile;
+        }
+        else
+        {
+            SavedConnections.Add(profile);
+        }
+
+        PersistSavedConnections();
+        SelectedConnection = profile;
+    }
+
+    private int FindProfileIndex(ConnectionProfile profile)
+    {
+        for (var i = 0; i < SavedConnections.Count; i++)
+        {
+            if (SavedConnections[i].TargetsSameDatabase(profile))
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private ConnectionProfile? BuildCurrentProfile()
+    {
+        var host = DatabaseHost?.Trim();
+        var database = DatabaseName?.Trim();
+        var schema = DatabaseSchema?.Trim();
+
+        if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(database))
+        {
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(schema))
+        {
+            schema = "dbo";
+        }
+
+        var port = DatabasePort?.Trim();
+        if (string.IsNullOrWhiteSpace(port))
+        {
+            port = null;
+        }
+
+        return new ConnectionProfile
+        {
+            Schema = schema!,
+            Host = host!,
+            Port = port,
+            Database = database!,
+            UseIntegratedSecurity = UseIntegratedSecurity,
+            TrustServerCertificate = TrustServerCertificate
+        };
+    }
+
+    private void PersistSavedConnections()
+    {
+        _profileStore.SaveProfiles(SavedConnections.ToList());
+    }
+
+    private void RemoveSelectedConnection()
+    {
+        if (SelectedConnection is null)
+        {
+            return;
+        }
+
+        var profile = SelectedConnection;
+        SelectedConnection = null;
+        SavedConnections.Remove(profile);
+        PersistSavedConnections();
     }
 
     private static string BuildTableKey(string schema, string table)

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -86,12 +87,18 @@ SELECT
     sch_from.name AS FromSchema,
     t_from.name AS FromTable,
     sch_to.name AS ToSchema,
-    t_to.name AS ToTable
+    t_to.name AS ToTable,
+    col_from.name AS FromColumn,
+    col_to.name AS ToColumn,
+    fkc.constraint_column_id
 FROM sys.foreign_keys fk
 JOIN sys.tables t_from ON fk.parent_object_id = t_from.object_id
 JOIN sys.schemas sch_from ON t_from.schema_id = sch_from.schema_id
 JOIN sys.tables t_to ON fk.referenced_object_id = t_to.object_id
 JOIN sys.schemas sch_to ON t_to.schema_id = sch_to.schema_id
+JOIN sys.foreign_key_columns fkc ON fk.object_id = fkc.constraint_object_id
+JOIN sys.columns col_from ON fkc.parent_object_id = col_from.object_id AND fkc.parent_column_id = col_from.column_id
+JOIN sys.columns col_to ON fkc.referenced_object_id = col_to.object_id AND fkc.referenced_column_id = col_to.column_id
 WHERE fk.is_disabled = 0 AND fk.is_ms_shipped = 0
 ";
 
@@ -100,6 +107,8 @@ WHERE fk.is_disabled = 0 AND fk.is_ms_shipped = 0
             : baseSql + "AND sch_from.name = @schema ORDER BY sch_from.name, t_from.name;";
 
         var relations = new List<ForeignKeyInfo>();
+        var relationLookup = new Dictionary<string, ForeignKeyInfo>(StringComparer.OrdinalIgnoreCase);
+        var relationOrder = new List<string>();
 
         await using var connection = new SqlConnection(connectionString);
         await connection.OpenAsync(cancellationToken);
@@ -113,12 +122,32 @@ WHERE fk.is_disabled = 0 AND fk.is_ms_shipped = 0
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
-            relations.Add(new ForeignKeyInfo(
-                reader.GetString(reader.GetOrdinal("ConstraintName")),
-                reader.GetString(reader.GetOrdinal("FromSchema")),
-                reader.GetString(reader.GetOrdinal("FromTable")),
-                reader.GetString(reader.GetOrdinal("ToSchema")),
-                reader.GetString(reader.GetOrdinal("ToTable"))));
+            var constraintName = reader.GetString(reader.GetOrdinal("ConstraintName"));
+
+            if (!relationLookup.TryGetValue(constraintName, out var relation))
+            {
+                relation = new ForeignKeyInfo(
+                    constraintName,
+                    reader.GetString(reader.GetOrdinal("FromSchema")),
+                    reader.GetString(reader.GetOrdinal("FromTable")),
+                    reader.GetString(reader.GetOrdinal("ToSchema")),
+                    reader.GetString(reader.GetOrdinal("ToTable")));
+
+                relationLookup[constraintName] = relation;
+                relationOrder.Add(constraintName);
+            }
+
+            var fromColumn = reader.GetString(reader.GetOrdinal("FromColumn"));
+            var toColumn = reader.GetString(reader.GetOrdinal("ToColumn"));
+            relation.AddColumnLink(new ColumnLink(fromColumn, toColumn));
+        }
+
+        foreach (var key in relationOrder)
+        {
+            if (relationLookup.TryGetValue(key, out var info))
+            {
+                relations.Add(info);
+            }
         }
 
         return relations;

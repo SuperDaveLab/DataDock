@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace SchemaViz.Gui.ViewModels.Diagram;
 
@@ -10,12 +12,13 @@ public sealed class TableNodeViewModel : ViewModelBase
     private bool _isSelected;
     private double _width = 220;
     private double _height = 140;
+    private readonly List<TableColumnViewModel> _columns;
 
-    public TableNodeViewModel(string schema, string name, IEnumerable<string> columns)
+    public TableNodeViewModel(string schema, string name, IEnumerable<TableColumnViewModel> columns)
     {
         Schema = schema;
         Name = name;
-        Columns = new List<string>(columns);
+        _columns = new List<TableColumnViewModel>(columns);
     }
 
     public string Schema { get; }
@@ -24,7 +27,7 @@ public sealed class TableNodeViewModel : ViewModelBase
 
     public string DisplayName => $"[{Schema}].[{Name}]";
 
-    public IReadOnlyList<string> Columns { get; }
+    public IReadOnlyList<TableColumnViewModel> Columns => _columns;
 
     public double X
     {
@@ -88,4 +91,10 @@ public sealed class TableNodeViewModel : ViewModelBase
 
     public double CenterX => X + Width / 2;
     public double CenterY => Y + Height / 2;
+
+    public TableColumnViewModel? FindColumn(string columnName)
+    {
+        return _columns.FirstOrDefault(column =>
+            string.Equals(column.Name, columnName, StringComparison.OrdinalIgnoreCase));
+    }
 }

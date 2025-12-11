@@ -86,6 +86,16 @@ Run CLI:
 dotnet run --project DataDock.Cli -- --help
 ```
 
+### Sample SQL Server schema
+
+Need a quick database to test SchemaViz relationships? A ready-made script lives at `samples/sample_schema.sql`. It creates a database named `SampleWarehouse` with five tables (`ops.Customers`, `ops.Products`, `ops.Orders`, `ops.OrderItems`, `ops.Addresses`) and the foreign keys between them.
+
+```bash
+sqlcmd -S localhost,1433 -U sa -P "YourStrong!Passw0rd" -i samples/sample_schema.sql
+```
+
+After it runs, point SchemaViz at database `SampleWarehouse`, schema `ops`, and you will see interconnected tables you can pan/zoom around.
+
 ---
 
 ## 📘 Documentation
