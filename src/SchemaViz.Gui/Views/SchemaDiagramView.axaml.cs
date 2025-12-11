@@ -907,4 +907,145 @@ public partial class SchemaDiagramView : UserControl
 			}
 		}
 	}
+
+	private void OnResetViewClick(object? sender, RoutedEventArgs e)
+	{
+		ResetViewCamera();
+	}
+
+	private void OnFitAllClick(object? sender, RoutedEventArgs e)
+	{
+		FitAllTables();
+	}
+
+	private void ResetViewCamera()
+	{
+		if (Diagram is null || DiagramViewportElement is null || DiagramCanvasElement is null)
+		{
+			return;
+		}
+
+		var viewportBounds = DiagramViewportElement.Bounds;
+		if (viewportBounds.Width <= 0 || viewportBounds.Height <= 0)
+		{
+			return;
+		}
+
+		var canvasWidth = DiagramCanvasElement.Width;
+		var canvasHeight = DiagramCanvasElement.Height;
+
+		const double zoom = 1.0;
+		var canvasScreenWidth = canvasWidth * zoom;
+		var canvasScreenHeight = canvasHeight * zoom;
+
+		var offsetX = (viewportBounds.Width - canvasScreenWidth) / 2.0;
+		var offsetY = (viewportBounds.Height - canvasScreenHeight) / 2.0;
+
+		_suppressDiagramEvents = true;
+		try
+		{
+			Diagram.Zoom = zoom;
+			Diagram.OffsetX = offsetX;
+			Diagram.OffsetY = offsetY;
+		}
+		finally
+		{
+			_suppressDiagramEvents = false;
+		}
+
+		_lastZoom = zoom;
+		_lastOffsetX = offsetX;
+		_lastOffsetY = offsetY;
+	}
+
+	private void FitAllTables()
+	{
+		if (Diagram is null || DiagramViewportElement is null || DiagramCanvasElement is null)
+		{
+			return;
+		}
+
+		if (Diagram.Tables is null || Diagram.Tables.Count == 0)
+		{
+			return;
+		}
+
+		var viewportBounds = DiagramViewportElement.Bounds;
+		if (viewportBounds.Width <= 0 || viewportBounds.Height <= 0)
+		{
+			return;
+		}
+
+		double minX = double.MaxValue;
+		double minY = double.MaxValue;
+		double maxX = double.MinValue;
+		double maxY = double.MinValue;
+
+		foreach (var table in Diagram.Tables)
+		{
+			var left = table.X;
+			var top = table.Y;
+			var right = table.X + table.Width;
+			var bottom = table.Y + table.Height;
+
+			if (left < minX) minX = left;
+			if (top < minY) minY = top;
+			if (right > maxX) maxX = right;
+			if (bottom > maxY) maxY = bottom;
+		}
+
+		if (minX == double.MaxValue || maxX == double.MinValue)
+		{
+			return;
+		}
+
+		const double padding = 100.0;
+		var worldWidth = (maxX - minX) + padding;
+		var worldHeight = (maxY - minY) + padding;
+
+		if (worldWidth <= 0 || worldHeight <= 0)
+		{
+			return;
+		}
+
+		var zoomX = viewportBounds.Width / worldWidth;
+		var zoomY = viewportBounds.Height / worldHeight;
+		var targetZoom = Math.Min(zoomX, zoomY);
+
+		var minZoom = SchemaDiagramViewModel.MinZoom;
+		var maxZoom = SchemaDiagramViewModel.MaxZoom;
+		targetZoom = Math.Clamp(targetZoom, minZoom, maxZoom);
+
+		if (targetZoom <= 0)
+		{
+			return;
+		}
+
+		var worldCenterX = minX + (worldWidth - padding) / 2.0;
+		var worldCenterY = minY + (worldHeight - padding) / 2.0;
+
+		var screenCenterX = viewportBounds.Width / 2.0;
+		var screenCenterY = viewportBounds.Height / 2.0;
+
+		var targetOffsetX = screenCenterX - worldCenterX * targetZoom;
+		var targetOffsetY = screenCenterY - worldCenterY * targetZoom;
+
+		var clamped = ClampOffsetToBounds(targetOffsetX, targetOffsetY, targetZoom);
+
+		_suppressDiagramEvents = true;
+		try
+		{
+			Diagram.Zoom = targetZoom;
+			Diagram.OffsetX = clamped.X;
+			Diagram.OffsetY = clamped.Y;
+		}
+		finally
+		{
+			_suppressDiagramEvents = false;
+		}
+
+		_lastZoom = targetZoom;
+		_lastOffsetX = clamped.X;
+		_lastOffsetY = clamped.Y;
+	}
 }

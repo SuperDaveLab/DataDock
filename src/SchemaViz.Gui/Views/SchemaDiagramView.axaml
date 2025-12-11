@@ -10,7 +10,15 @@
 	<UserControl.Resources>
 		<conv:NodeCenterConverter x:Key="NodeCenterConverter" />
 		<conv:TableSelectedBrushConverter x:Key="TableSelectedBrushConverter" />
+		<conv:SchemaToBrushConverter x:Key="SchemaToBrushConverter" />
 	</UserControl.Resources>
+
+	<UserControl.Styles>
+		<Style Selector="Border.table-node:pointerover">
+			<Setter Property="BorderBrush" Value="#93C5FD" />
+			<Setter Property="BorderThickness" Value="2" />
+		</Style>
+	</UserControl.Styles>
 
 	<Grid RowDefinitions="Auto,*">
 		<!-- Toolbar -->
@@ -31,6 +39,10 @@
 					Click="OnExportViewPngClick" />
 			<Button Content="Export PNG (Full)"
 					Click="OnExportFullPngClick" />
+			<Button Content="Fit All"
+					Click="OnFitAllClick" />
+			<Button Content="Reset View"
+					Click="OnResetViewClick" />
 		</StackPanel>
 
 		<!-- Viewport -->
@@ -111,6 +123,8 @@
 											Canvas.Top="{Binding Y}"
 											Width="{Binding Width}"
 											CornerRadius="6"
+											Margin="4"
+											Classes="table-node"
 											Background="{Binding IsSelected, Converter={StaticResource TableSelectedBrushConverter}}"
 											BorderBrush="#6C7086"
 											BorderThickness="1"
@@ -118,34 +132,64 @@
 											PointerMoved="OnNodePointerMoved"
 											PointerReleased="OnNodePointerReleased"
 											SizeChanged="OnNodeSizeChanged">
-									<Grid RowDefinitions="Auto,*"
-												ColumnDefinitions="*">
-										<Border Background="#1F2230"
-														CornerRadius="6,6,0,0"
-														Padding="8">
+									<Border.Effect>
+										<DropShadowEffect BlurRadius="8"
+															Opacity="0.45"
+															OffsetX="3"
+															OffsetY="3"
+															Color="#000000" />
+									</Border.Effect>
+									<Grid RowDefinitions="Auto,*" ColumnDefinitions="*">
+										<DockPanel Grid.Row="0" Margin="0,0,0,4">
+											<Border Width="4"
+													Margin="0,0,6,0"
+													Background="{Binding Schema, Converter={StaticResource SchemaToBrushConverter}}" />
 											<TextBlock Text="{Binding DisplayName}"
 														FontWeight="Bold"
 														Foreground="#E2E8F0"
 														FontSize="13" />
-										</Border>
+										</DockPanel>
 										<ItemsControl Grid.Row="1"
-												ItemsSource="{Binding Columns}"
-														Padding="8">
+														ItemsSource="{Binding Columns}"
+														Padding="4">
 											<ItemsControl.ItemTemplate>
 												<DataTemplate>
-														<Grid ColumnDefinitions="*,Auto"
-																Margin="0,2">
-															<TextBlock Text="{Binding Name}"
+													<Grid ColumnDefinitions="Auto,*,Auto" Margin="0,2" ColumnSpacing="6">
+														<StackPanel Grid.Column="0"
+																	Orientation="Horizontal"
+																	Spacing="4"
+																	VerticalAlignment="Center">
+															<Border Background="#3B82F6"
+																	CornerRadius="4"
+																	Padding="6,2"
+																	IsVisible="{Binding IsPrimaryKey}">
+																<TextBlock Text="PK"
+																			FontSize="11"
+																			Foreground="White" />
+															</Border>
+															<Border Background="#EF4444"
+																	CornerRadius="4"
+																	Padding="6,2"
+																	IsVisible="{Binding IsForeignKey}">
+																<TextBlock Text="FK"
+																			FontSize="11"
+																			Foreground="White" />
+															</Border>
+														</StackPanel>
+														<TextBlock Grid.Column="1"
+																	Text="{Binding Name}"
 																	Foreground="#CBD5F5"
 																	FontSize="12"
-																	TextTrimming="CharacterEllipsis" />
-															<TextBlock Grid.Column="1"
-																Text="{Binding DataType}"
-																Foreground="#94A3B8"
-																FontSize="12"
-																Margin="12,0,0,0"
-																TextTrimming="CharacterEllipsis" />
-														</Grid>
+																	TextTrimming="CharacterEllipsis"
+																	VerticalAlignment="Center" />
+														<TextBlock Grid.Column="2"
+																	Text="{Binding DataType}"
+																	Foreground="#94A3B8"
+																	FontSize="12"
+																	TextTrimming="CharacterEllipsis"
+																	VerticalAlignment="Center"
+																	HorizontalAlignment="Right" />
+													</Grid>
 												</DataTemplate>
 											</ItemsControl.ItemTemplate>
 										</ItemsControl>
