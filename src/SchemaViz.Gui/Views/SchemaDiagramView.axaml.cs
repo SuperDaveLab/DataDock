@@ -1,11 +1,17 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
+using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
+using Avalonia.Platform;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform.Storage;
 using SchemaViz.Gui.ViewModels.Diagram;
 
 namespace SchemaViz.Gui.Views;
@@ -382,6 +388,7 @@ public partial class SchemaDiagramView : UserControl
 		if (_attachedDiagram is not null)
 		{
 			_attachedDiagram.PropertyChanged -= OnDiagramPropertyChanged;
+			_attachedDiagram.SchemaExportRequested -= OnSchemaExportRequested;
 			_attachedDiagram = null;
 		}
 
@@ -395,6 +402,7 @@ public partial class SchemaDiagramView : UserControl
 		_lastOffsetX = diagram.OffsetX;
 		_lastOffsetY = diagram.OffsetY;
 		diagram.PropertyChanged += OnDiagramPropertyChanged;
+		diagram.SchemaExportRequested += OnSchemaExportRequested;
 		_initialLayoutApplied = false;
 		_initialViewportCentered = false;
 		UpdateCanvasSize();
@@ -621,5 +629,282 @@ public partial class SchemaDiagramView : UserControl
 		// Only initialize once
 		DiagramViewportElement.LayoutUpdated -= OnViewportLayoutUpdated;
 		CenterViewportOnTables();
+	}
+
+	private async void OnSchemaExportRequested(object? sender, SchemaExportRequestedEventArgs e)
+	{
+		if (TopLevel.GetTopLevel(this) is not Window window)
+		{
+			return;
+		}
+
+		var storageProvider = window.StorageProvider;
+		if (storageProvider is null || !storageProvider.CanSave)
+		{
+			return;
+		}
+
+		var defaultName = string.IsNullOrWhiteSpace(e.SuggestedFileName)
+			? "schema-export"
+			: e.SuggestedFileName;
+		var initialFileName = defaultName.EndsWith(".json", StringComparison.OrdinalIgnoreCase)
+			? defaultName
+			: $"{defaultName}.json";
+
+		var downloadsFolder = GetWellKnownFolderPath(Environment.SpecialFolder.UserProfile, "Downloads");
+		var suggestedFolder = await TryGetFolderAsync(storageProvider, downloadsFolder);
+
+		var options = new FilePickerSaveOptions
+		{
+			Title = "Export schema as JSON",
+			SuggestedFileName = initialFileName,
+			DefaultExtension = "json",
+			ShowOverwritePrompt = true,
+			SuggestedStartLocation = suggestedFolder,
+			FileTypeChoices = new List<FilePickerFileType>
+			{
+				new("JSON Files") { Patterns = new[] { "*.json" } },
+				new("All Files") { Patterns = new[] { "*.*" } }
+			}
+		};
+
+		var file = await storageProvider.SaveFilePickerAsync(options);
+		if (file is null)
+		{
+			return;
+		}
+
+		try
+		{
+			await using var stream = await file.OpenWriteAsync();
+			await using var writer = new StreamWriter(stream);
+			await writer.WriteAsync(e.JsonContent);
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine($"Failed to export schema: {ex.Message}");
+		}
+	}
+
+	private Window? GetWindow()
+	{
+		return TopLevel.GetTopLevel(this) as Window;
+	}
+
+	private async void OnExportViewPngClick(object? sender, RoutedEventArgs e)
+	{
+		var window = GetWindow();
+		if (window is null)
+		{
+			return;
+		}
+
+		var storageProvider = window.StorageProvider;
+		if (storageProvider is null || !storageProvider.CanSave)
+		{
+			return;
+		}
+
+		var picturesFolder = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
+		var suggestedFolder = await TryGetFolderAsync(storageProvider, picturesFolder);
+
+		var options = new FilePickerSaveOptions
+		{
+			Title = "Export diagram (current view) as PNG",
+			SuggestedFileName = "schema-view.png",
+			DefaultExtension = "png",
+			ShowOverwritePrompt = true,
+			SuggestedStartLocation = suggestedFolder,
+			FileTypeChoices = new List<FilePickerFileType>
+			{
+				new("PNG image") { Patterns = new[] { "*.png" } },
+				new("All Files") { Patterns = new[] { "*.*" } }
+			}
+		};
+
+		var file = await storageProvider.SaveFilePickerAsync(options);
+		if (file is null)
+		{
+			return;
+		}
+
+		try
+		{
+			var filePath = file.Path.LocalPath;
+			await ExportViewportToPngAsync(filePath);
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine($"Failed to export viewport PNG: {ex.Message}");
+		}
+	}
+
+	private async void OnExportFullPngClick(object? sender, RoutedEventArgs e)
+	{
+		var window = GetWindow();
+		if (window is null)
+		{
+			return;
+		}
+
+		var storageProvider = window.StorageProvider;
+		if (storageProvider is null || !storageProvider.CanSave)
+		{
+			return;
+		}
+
+		var picturesFolder = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
+		var suggestedFolder = await TryGetFolderAsync(storageProvider, picturesFolder);
+
+		var options = new FilePickerSaveOptions
+		{
+			Title = "Export full diagram as PNG",
+			SuggestedFileName = "schema-full.png",
+			DefaultExtension = "png",
+			ShowOverwritePrompt = true,
+			SuggestedStartLocation = suggestedFolder,
+			FileTypeChoices = new List<FilePickerFileType>
+			{
+				new("PNG image") { Patterns = new[] { "*.png" } },
+				new("All Files") { Patterns = new[] { "*.*" } }
+			}
+		};
+
+		var file = await storageProvider.SaveFilePickerAsync(options);
+		if (file is null)
+		{
+			return;
+		}
+
+		try
+		{
+			var filePath = file.Path.LocalPath;
+			await ExportFullDiagramToPngAsync(filePath);
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine($"Failed to export full diagram PNG: {ex.Message}");
+		}
+	}
+
+	private static string? GetWellKnownFolderPath(Environment.SpecialFolder baseFolder, string childFolderName)
+	{
+		try
+		{
+			var basePath = Environment.GetFolderPath(baseFolder);
+			if (string.IsNullOrWhiteSpace(basePath))
+			{
+				return null;
+			}
+
+			var combined = Path.Combine(basePath, childFolderName);
+			return combined;
+		}
+		catch
+		{
+			return null;
+		}
+	}
+
+	private static async Task<IStorageFolder?> TryGetFolderAsync(IStorageProvider provider, string? folderPath)
+	{
+		if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath))
+		{
+			return null;
+		}
+
+		try
+		{
+			var uri = new Uri(folderPath);
+			return await provider.TryGetFolderFromPathAsync(uri);
+		}
+		catch
+		{
+			return null;
+		}
+	}
+
+	private async Task ExportViewportToPngAsync(string filePath)
+	{
+		if (DiagramViewportElement is null)
+		{
+			return;
+		}
+
+		// Ensure layout is up-to-date
+		DiagramViewportElement.Measure(Size.Infinity);
+		DiagramViewportElement.Arrange(DiagramViewportElement.Bounds);
+		DiagramViewportElement.UpdateLayout();
+
+		var bounds = DiagramViewportElement.Bounds;
+		if (bounds.Width <= 0 || bounds.Height <= 0)
+		{
+			return;
+		}
+
+		var pixelWidth = (int)Math.Ceiling(bounds.Width);
+		var pixelHeight = (int)Math.Ceiling(bounds.Height);
+
+		var rtb = new RenderTargetBitmap(new PixelSize(pixelWidth, pixelHeight));
+		rtb.Render(DiagramViewportElement);
+
+		await using var fs = File.Open(filePath, FileMode.Create, FileAccess.Write);
+		rtb.Save(fs);
+	}
+
+	private async Task ExportFullDiagramToPngAsync(string filePath)
+	{
+		if (DiagramCanvasElement is null || Diagram is null)
+		{
+			return;
+		}
+
+		// Save current camera state
+		var oldZoom = Diagram.Zoom;
+		var oldOffsetX = Diagram.OffsetX;
+		var oldOffsetY = Diagram.OffsetY;
+
+		try
+		{
+			// Temporarily reset view so the entire canvas is in world space with 1:1 scale.
+			_suppressDiagramEvents = true;
+			Diagram.Zoom = 1.0;
+			Diagram.OffsetX = 0.0;
+			Diagram.OffsetY = 0.0;
+
+			// Ensure layout is up-to-date
+			DiagramCanvasElement.Measure(Size.Infinity);
+			DiagramCanvasElement.Arrange(new Rect(0, 0, Diagram.CanvasWidth, Diagram.CanvasHeight));
+			DiagramCanvasElement.UpdateLayout();
+
+			var pixelWidth = (int)Math.Ceiling(Diagram.CanvasWidth);
+			var pixelHeight = (int)Math.Ceiling(Diagram.CanvasHeight);
+
+			if (pixelWidth <= 0 || pixelHeight <= 0)
+			{
+				return;
+			}
+
+			var rtb = new RenderTargetBitmap(new PixelSize(pixelWidth, pixelHeight));
+			rtb.Render(DiagramCanvasElement);
+
+			await using var fs = File.Open(filePath, FileMode.Create, FileAccess.Write);
+			rtb.Save(fs);
+		}
+		finally
+		{
+			// Restore camera state
+			_suppressDiagramEvents = true;
+			try
+			{
+				Diagram.Zoom = oldZoom;
+				Diagram.OffsetX = oldOffsetX;
+				Diagram.OffsetY = oldOffsetY;
+			}
+			finally
+			{
+				_suppressDiagramEvents = false;
+			}
+		}
 	}
 }

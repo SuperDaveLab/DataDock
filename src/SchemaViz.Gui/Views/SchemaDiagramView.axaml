@@ -25,6 +25,12 @@
 							Value="{Binding Zoom}" />
 			<Button Content="Reset"
 							Command="{Binding ResetViewCommand}" />
+			<Button Content="Export JSON"
+					Command="{Binding ExportSchemaCommand}" />
+			<Button Content="Export PNG (View)"
+					Click="OnExportViewPngClick" />
+			<Button Content="Export PNG (Full)"
+					Click="OnExportFullPngClick" />
 		</StackPanel>
 
 		<!-- Viewport -->
@@ -127,9 +133,19 @@
 														Padding="8">
 											<ItemsControl.ItemTemplate>
 												<DataTemplate>
-													<TextBlock Text="{Binding DiagramLabel}"
-															Foreground="#CBD5F5"
-															FontSize="12" />
+														<Grid ColumnDefinitions="*,Auto"
+																Margin="0,2">
+															<TextBlock Text="{Binding Name}"
+																	Foreground="#CBD5F5"
+																	FontSize="12"
+																	TextTrimming="CharacterEllipsis" />
+															<TextBlock Grid.Column="1"
+																Text="{Binding DataType}"
+																Foreground="#94A3B8"
+																FontSize="12"
+																Margin="12,0,0,0"
+																TextTrimming="CharacterEllipsis" />
+														</Grid>
 												</DataTemplate>
 											</ItemsControl.ItemTemplate>
 										</ItemsControl>

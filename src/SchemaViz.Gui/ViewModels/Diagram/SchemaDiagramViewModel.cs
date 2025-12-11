@@ -2,9 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.IO;
 using System.Linq;
 using System.Windows.Input;
 using Avalonia;
+using SchemaViz.Core.SchemaExport;
 using SchemaViz.Gui.Commands;
 
 namespace SchemaViz.Gui.ViewModels.Diagram;
@@ -22,11 +24,18 @@ public sealed class SchemaDiagramViewModel : ViewModelBase
     private TableNodeViewModel? _selectedTable;
     private double _canvasWidth = 4000;
     private double _canvasHeight = 2500;
+    private readonly SchemaExportService _exportService = new();
+    private readonly RelayCommand _exportSchemaCommand;
+    private string? _databaseName;
+    private string? _schemaFilter;
 
     public SchemaDiagramViewModel()
     {
         ResetViewCommand = new RelayCommand(_ => ResetView());
+        _exportSchemaCommand = new RelayCommand(_ => ExportSchema(), _ => Tables.Count > 0);
+        ExportSchemaCommand = _exportSchemaCommand;
         Relationships.CollectionChanged += OnRelationshipsCollectionChanged;
+        Tables.CollectionChanged += OnTablesCollectionChanged;
     }
 
     public ObservableCollection<TableNodeViewModel> Tables { get; } = new();
@@ -34,6 +43,8 @@ public sealed class SchemaDiagramViewModel : ViewModelBase
     public ObservableCollection<RelationshipViewModel> Relationships { get; } = new();
 
     public ICommand ResetViewCommand { get; }
+
+    public ICommand ExportSchemaCommand { get; }
 
     public double Zoom
     {
@@ -95,6 +106,20 @@ public sealed class SchemaDiagramViewModel : ViewModelBase
         get => _canvasHeight;
         set => SetProperty(ref _canvasHeight, Math.Max(MinCanvasHeight, value));
     }
+
+    public string? DatabaseName
+    {
+        get => _databaseName;
+        set => SetProperty(ref _databaseName, value);
+    }
+
+    public string? SchemaFilter
+    {
+        get => _schemaFilter;
+        set => SetProperty(ref _schemaFilter, value);
+    }
+
+    public event EventHandler<SchemaExportRequestedEventArgs>? SchemaExportRequested;
 
     public void ResetView()
     {
@@ -176,5 +201,29 @@ public sealed class SchemaDiagramViewModel : ViewModelBase
     {
         OnPropertyChanged(nameof(OutgoingRelationships));
         OnPropertyChanged(nameof(IncomingRelationships));
+    }
+
+    private void OnTablesCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        _exportSchemaCommand.RaiseCanExecuteChanged();
+    }
+
+    private void ExportSchema()
+    {
+        var export = _exportService.CreateExport(DatabaseName, SchemaFilter, Tables, Relationships);
+        var json = _exportService.ToJson(export);
+        var suggestedFileName = BuildSuggestedFileName();
+        SchemaExportRequested?.Invoke(this, new SchemaExportRequestedEventArgs(json, suggestedFileName));
+    }
+
+    private string BuildSuggestedFileName()
+    {
+        var baseName = string.IsNullOrWhiteSpace(DatabaseName)
+            ? "schema-export"
+            : $"{DatabaseName}-schema";
+
+        var invalidChars = Path.GetInvalidFileNameChars();
+        var sanitized = new string(baseName.Select(ch => invalidChars.Contains(ch) ? '_' : ch).ToArray());
+        return string.IsNullOrWhiteSpace(sanitized) ? "schema-export" : sanitized;
     }
 }

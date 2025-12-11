@@ -51,8 +51,10 @@
                 </ComboBox.ItemTemplate>
               </ComboBox>
               <Button Content="Forget"
+                      Grid.Column="1"
                       Command="{Binding RemoveSelectedConnectionCommand}"
-                      IsEnabled="{Binding SelectedConnection, Converter={StaticResource HasSelectionConverter}}" />
+                      IsEnabled="{Binding SelectedConnection, Converter={StaticResource HasSelectionConverter}}"
+                      ToolTip.Tip="Remove the currently selected saved connection" />
             </Grid>
             <TextBlock Text="Connections are saved automatically after a successful test."
                        Foreground="#94A3B8"

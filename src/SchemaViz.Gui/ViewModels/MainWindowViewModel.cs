@@ -60,6 +60,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
         var appConfig = AppConfigLoader.Load();
         _defaultSettings = ConnectionSettingsResolver.Resolve(new ImportOptions(), new ImportProfile(), appConfig);
+        Diagram.DatabaseName = _databaseName;
+        Diagram.SchemaFilter = NormalizeSchemaFilter();
         ApplyDefaults(_defaultSettings);
         LoadSavedConnections();
     }
@@ -112,13 +114,25 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public string DatabaseName
     {
         get => _databaseName;
-        set => SetProperty(ref _databaseName, value);
+        set
+        {
+            if (SetProperty(ref _databaseName, value))
+            {
+                Diagram.DatabaseName = value;
+            }
+        }
     }
 
     public string DatabaseSchema
     {
         get => _databaseSchema;
-        set => SetProperty(ref _databaseSchema, value);
+        set
+        {
+            if (SetProperty(ref _databaseSchema, value))
+            {
+                Diagram.SchemaFilter = NormalizeSchemaFilter();
+            }
+        }
     }
 
     public bool UseIntegratedSecurity
