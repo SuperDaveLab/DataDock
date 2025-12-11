@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
-PROJECT="$REPO_ROOT/DataDock.Gui/DataDock.Gui.csproj"
+PROJECT="$REPO_ROOT/src/DataDock.Gui/DataDock.Gui.csproj"
 CONFIG="Release"
 FRAMEWORK="net8.0"
 RIDS=("win-x64" "osx-x64" "osx-arm64" "linux-x64")
@@ -33,7 +33,7 @@ for rid in "${RIDS[@]}"; do
   dotnet publish "$PROJECT" -c "$CONFIG" -r "$rid" --self-contained true \
     /p:PublishSingleFile=true /p:IncludeNativeLibrariesForSelfExtract=true
 
-  publish_dir="$REPO_ROOT/DataDock.Gui/bin/$CONFIG/$FRAMEWORK/$rid/publish"
+  publish_dir="$REPO_ROOT/src/DataDock.Gui/bin/$CONFIG/$FRAMEWORK/$rid/publish"
   if [[ ! -d "$publish_dir" ]]; then
     echo "Publish directory not found: $publish_dir" >&2
     exit 1
