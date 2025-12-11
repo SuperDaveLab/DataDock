@@ -74,6 +74,8 @@ SchemaViz is a new Avalonia desktop app that reuses `DataDock.Core`/`DataDock.Se
 dotnet run --project src/SchemaViz.Gui
 ```
 
+![SchemaViz diagram preview](SchemaViz.png)
+
 When the window opens:
 
 - The connection panel will pre-fill from `datadock.config.json` if available. Otherwise, type your SQL Server host (e.g., `localhost,1433` when using the provided Docker container), database name, and schema (`dbo` by default).
