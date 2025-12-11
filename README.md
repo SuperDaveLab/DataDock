@@ -66,11 +66,37 @@ Run GUI:
 dotnet run --project DataDock.Gui
 ```
 
+### Run SchemaViz (preview)
+
+SchemaViz is a new Avalonia desktop app that reuses `DataDock.Core`/`DataDock.Services` for read-only schema visualization. It resolves the same `datadock.config.json` chain, so any defaults you set there (connection string, schema) automatically flow into the UI.
+
+```bash
+dotnet run --project src/SchemaViz.Gui
+```
+
+![SchemaViz diagram preview](SchemaViz.png)
+
+When the window opens:
+
+- The connection panel will pre-fill from `datadock.config.json` if available. Otherwise, type your SQL Server host (e.g., `localhost,1433` when using the provided Docker container), database name, and schema (`dbo` by default).
+- Click **Test Connection** to load tables. SchemaViz lists schema-qualified tables on the left; selecting one shows its columns, data types, and nullability on the right.
+- Update the datadock config or the UI fields to point at different servers/databases as needed. No data changes occur—SchemaViz only reads metadata.
+
 Run CLI:
 
 ```bash
 dotnet run --project DataDock.Cli -- --help
 ```
+
+### Sample SQL Server schema
+
+Need a quick database to test SchemaViz relationships? A ready-made script lives at `samples/sample_schema.sql`. It creates a database named `SampleWarehouse` with five tables (`ops.Customers`, `ops.Products`, `ops.Orders`, `ops.OrderItems`, `ops.Addresses`) and the foreign keys between them.
+
+```bash
+sqlcmd -S localhost,1433 -U sa -P "YourStrong!Passw0rd" -i samples/sample_schema.sql
+```
+
+After it runs, point SchemaViz at database `SampleWarehouse`, schema `ops`, and you will see interconnected tables you can pan/zoom around.
 
 ---
 

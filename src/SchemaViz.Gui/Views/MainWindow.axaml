@@ -1,0 +1,281 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:SchemaViz.Gui.ViewModels"
+        xmlns:models="using:SchemaViz.Gui.Models"
+        xmlns:views="clr-namespace:SchemaViz.Gui.Views"
+        xmlns:conv="clr-namespace:SchemaViz.Gui.Converters"
+        xmlns:diagram="clr-namespace:SchemaViz.Gui.ViewModels.Diagram"
+        mc:Ignorable="d"
+        x:Class="SchemaViz.Gui.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Width="1200"
+        Height="780"
+        Title="SchemaViz">
+
+  <Window.Resources>
+    <conv:NullToBoolConverter x:Key="HasSelectionConverter" />
+    <conv:NullToBoolConverter x:Key="NoSelectionConverter" TrueWhenNull="True" />
+  </Window.Resources>
+
+  <Grid ColumnDefinitions="340,16,*" RowDefinitions="Auto,*">
+    <Border Grid.Column="0"
+            Grid.RowSpan="2"
+            Background="#F3F6FF"
+            Padding="20">
+      <ScrollViewer VerticalScrollBarVisibility="Auto"
+            Padding="0,0,8,0">
+        <StackPanel Spacing="16">
+          <StackPanel Spacing="4">
+            <TextBlock Text="Connection"
+                       FontSize="20"
+                       FontWeight="SemiBold" />
+            <TextBlock Text="Configure how SchemaViz connects to SQL Server."
+                       Foreground="#5E6882"
+                       TextWrapping="Wrap" />
+          </StackPanel>
+
+          <StackPanel Spacing="8">
+            <TextBlock Text="Saved connections"
+                       FontSize="18"
+                       FontWeight="SemiBold" />
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+              <ComboBox ItemsSource="{Binding SavedConnections}"
+                        SelectedItem="{Binding SelectedConnection, Mode=TwoWay}"
+                        PlaceholderText="Select a saved connection">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate x:DataType="models:ConnectionProfile">
+                    <TextBlock Text="{Binding DisplayName}" />
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+              <Button Content="Forget"
+                      Grid.Column="1"
+                      Command="{Binding RemoveSelectedConnectionCommand}"
+                      IsEnabled="{Binding SelectedConnection, Converter={StaticResource HasSelectionConverter}}"
+                      ToolTip.Tip="Remove the currently selected saved connection" />
+            </Grid>
+            <TextBlock Text="Connections are saved automatically after a successful test."
+                       Foreground="#94A3B8"
+                       FontSize="12" />
+          </StackPanel>
+
+          <StackPanel Spacing="8">
+            <TextBlock Text="Schema" FontWeight="SemiBold" />
+            <TextBox Text="{Binding DatabaseSchema, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+            <TextBlock Text="Server host &amp; port" FontWeight="SemiBold" />
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+              <TextBox Text="{Binding DatabaseHost, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                       Watermark="hostname or host\instance" />
+              <TextBox Grid.Column="1"
+                       Width="90"
+                       Text="{Binding DatabasePort, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                       HorizontalContentAlignment="Center" />
+            </Grid>
+
+            <TextBlock Text="Database name" FontWeight="SemiBold" />
+            <TextBox Text="{Binding DatabaseName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+            <CheckBox Content="Use Windows / Integrated security"
+                      IsChecked="{Binding UseIntegratedSecurity, Mode=TwoWay}" />
+
+            <TextBlock Text="SQL username" FontWeight="SemiBold" />
+            <TextBox Text="{Binding DatabaseUser, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                     IsEnabled="{Binding IsSqlAuthEnabled}"
+                     Watermark="e.g. sa" />
+
+            <TextBlock Text="SQL password" FontWeight="SemiBold" />
+            <TextBox Text="{Binding DatabasePassword, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                     PasswordChar="*"
+                     IsEnabled="{Binding IsSqlAuthEnabled}" />
+
+            <CheckBox Content="Trust server certificate"
+                      IsChecked="{Binding TrustServerCertificate, Mode=TwoWay}" />
+
+            <Button Content="Test Connection"
+                    Click="OnTestConnectionClicked"
+                    IsEnabled="{Binding CanTestConnection}" />
+
+            <TextBlock Text="{Binding StatusMessage}"
+                       Foreground="#475569"
+                       TextWrapping="Wrap" />
+          </StackPanel>
+
+          <StackPanel Spacing="8">
+            <TextBlock Text="Tables"
+                       FontSize="18"
+                       FontWeight="SemiBold" />
+            <ListBox ItemsSource="{Binding Tables}"
+                     SelectedItem="{Binding SelectedTable, Mode=TwoWay}"
+                     Height="300">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="models:TableListItem">
+                  <StackPanel>
+                    <TextBlock Text="{Binding DisplayName}" />
+                    <TextBlock Text="{Binding RowCountDisplay}"
+                               Foreground="#6F7B99"
+                               FontSize="12" />
+                  </StackPanel>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+          </StackPanel>
+        </StackPanel>
+      </ScrollViewer>
+    </Border>
+
+    <Border Grid.Column="2"
+            Grid.RowSpan="2"
+            Padding="24"
+            Background="White"
+            CornerRadius="18">
+      <TabControl>
+        <TabItem Header="Table Details">
+          <Grid RowDefinitions="Auto,*,Auto" RowSpacing="16">
+            <StackPanel Orientation="Horizontal" Spacing="16">
+              <StackPanel>
+                <TextBlock Text="{Binding SelectedTableDisplay}"
+                           FontSize="24"
+                           FontWeight="SemiBold" />
+                <TextBlock Text="{Binding SelectedTableDetails}"
+                           Foreground="#6F7B99" />
+              </StackPanel>
+            </StackPanel>
+
+            <Border Grid.Row="1"
+                    Background="#0F1118"
+                    CornerRadius="14"
+                    Padding="20"
+                    BorderBrush="#1F2230"
+                    BorderThickness="1">
+              <Grid DataContext="{Binding Diagram}">
+                <TextBlock Text="Select a table to see details."
+                           Foreground="#94A3B8"
+                           FontSize="14"
+                           TextWrapping="Wrap"
+                           IsVisible="{Binding SelectedTable, Converter={StaticResource NoSelectionConverter}}" />
+
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              IsVisible="{Binding SelectedTable, Converter={StaticResource HasSelectionConverter}}">
+                  <StackPanel Spacing="16">
+                    <TextBlock Text="{Binding SelectedTable.DisplayName}"
+                               FontSize="20"
+                               FontWeight="SemiBold"
+                               Foreground="#E2E8F0" />
+
+                    <StackPanel Spacing="8">
+                      <TextBlock Text="Columns"
+                                 FontWeight="SemiBold"
+                                 Foreground="#A5B4FC" />
+                      <ItemsControl ItemsSource="{Binding SelectedTable.Columns}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="diagram:TableColumnViewModel">
+                            <Border Margin="0,4,0,4"
+                                    Background="#151924"
+                                    CornerRadius="6"
+                                    Padding="8">
+                              <Grid ColumnDefinitions="*,Auto">
+                                <StackPanel>
+                                  <TextBlock Text="{Binding Name}"
+                                             FontWeight="SemiBold"
+                                             Foreground="#E2E8F0" />
+                                  <TextBlock Text="{Binding DataType}"
+                                             Foreground="#94A3B8"
+                                             FontSize="12" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            Spacing="4"
+                                            VerticalAlignment="Center">
+                                  <Border Background="#3B82F6"
+                                          CornerRadius="4"
+                                          Padding="6,2"
+                                          IsVisible="{Binding IsPrimaryKey}">
+                                    <TextBlock Text="PK"
+                                               FontSize="11"
+                                               Foreground="White" />
+                                  </Border>
+                                  <Border Background="#EF4444"
+                                          CornerRadius="4"
+                                          Padding="6,2"
+                                          IsVisible="{Binding IsForeignKey}">
+                                    <TextBlock Text="FK"
+                                               FontSize="11"
+                                               Foreground="White" />
+                                  </Border>
+                                </StackPanel>
+                              </Grid>
+                            </Border>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+
+                    <StackPanel Spacing="8">
+                      <TextBlock Text="Relationships"
+                                 FontWeight="SemiBold"
+                                 Foreground="#A5B4FC" />
+
+                      <TextBlock Text="Outgoing (FK references)"
+                                 Foreground="#94A3B8"
+                                 FontSize="13" />
+                      <ItemsControl ItemsSource="{Binding OutgoingRelationships}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="diagram:RelationshipViewModel">
+                            <Border Margin="0,4,0,4" Padding="8" Background="#151924" CornerRadius="6">
+                              <StackPanel>
+                                <TextBlock Text="{Binding ForeignKeyName}"
+                                           FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding From.DisplayName, StringFormat={}→ {0}}"
+                                           Foreground="#E2E8F0" />
+                                <TextBlock Text="{Binding ChildToParentColumnSummary}"
+                                           Foreground="#94A3B8"
+                                           FontSize="12" />
+                              </StackPanel>
+                            </Border>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+
+                      <TextBlock Text="Incoming (referenced by others)"
+                                 Foreground="#94A3B8"
+                                 FontSize="13"
+                                 Margin="0,12,0,0" />
+                      <ItemsControl ItemsSource="{Binding IncomingRelationships}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="diagram:RelationshipViewModel">
+                            <Border Margin="0,4,0,4" Padding="8" Background="#151924" CornerRadius="6">
+                              <StackPanel>
+                                <TextBlock Text="{Binding ForeignKeyName}"
+                                           FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding To.DisplayName, StringFormat={}← {0}}"
+                                           Foreground="#E2E8F0" />
+                                <TextBlock Text="{Binding ChildToParentColumnSummary}"
+                                           Foreground="#94A3B8"
+                                           FontSize="12" />
+                              </StackPanel>
+                            </Border>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+                  </StackPanel>
+                </ScrollViewer>
+              </Grid>
+            </Border>
+
+            <TextBlock Grid.Row="2"
+                       Text="{Binding TableHintMessage}"
+                       Foreground="#94A3B8"
+                       TextWrapping="Wrap" />
+          </Grid>
+        </TabItem>
+        <TabItem Header="Diagram">
+          <views:SchemaDiagramView DataContext="{Binding Diagram}" />
+        </TabItem>
+      </TabControl>
+    </Border>
+  </Grid>
+</Window>

@@ -1,0 +1,206 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+				 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+				 xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+				 xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+				 xmlns:conv="clr-namespace:SchemaViz.Gui.Converters"
+				 mc:Ignorable="d"
+				 x:CompileBindings="False"
+				 x:Class="SchemaViz.Gui.Views.SchemaDiagramView">
+
+	<UserControl.Resources>
+		<conv:NodeCenterConverter x:Key="NodeCenterConverter" />
+		<conv:TableSelectedBrushConverter x:Key="TableSelectedBrushConverter" />
+		<conv:SchemaToBrushConverter x:Key="SchemaToBrushConverter" />
+	</UserControl.Resources>
+
+	<UserControl.Styles>
+		<Style Selector="Border.table-node:pointerover">
+			<Setter Property="BorderBrush" Value="#93C5FD" />
+			<Setter Property="BorderThickness" Value="2" />
+		</Style>
+	</UserControl.Styles>
+
+	<Grid RowDefinitions="Auto,*">
+		<!-- Toolbar -->
+		<StackPanel Orientation="Horizontal"
+					Margin="8"
+					Spacing="8"
+					>
+			<TextBlock Text="Zoom:" VerticalAlignment="Center" />
+			<Slider Minimum="0.15"
+							Maximum="3"
+							Width="160"
+							Value="{Binding Zoom}" />
+			<Button Content="Reset"
+							Command="{Binding ResetViewCommand}" />
+			<Button Content="Export JSON"
+					Command="{Binding ExportSchemaCommand}" />
+			<Button Content="Export PNG (View)"
+					Click="OnExportViewPngClick" />
+			<Button Content="Export PNG (Full)"
+					Click="OnExportFullPngClick" />
+			<Button Content="Fit All"
+					Click="OnFitAllClick" />
+			<Button Content="Reset View"
+					Click="OnResetViewClick" />
+		</StackPanel>
+
+		<!-- Viewport -->
+		<Border Grid.Row="1"
+				Background="#10131A"
+				ClipToBounds="True">
+			<Grid x:Name="DiagramViewport"
+						Background="Transparent"
+						PointerPressed="OnCanvasPointerPressed"
+						PointerMoved="OnCanvasPointerMoved"
+					PointerReleased="OnCanvasPointerReleased"
+					PointerWheelChanged="OnCanvasPointerWheelChanged">
+
+				<Canvas x:Name="DiagramCanvas"
+							Width="{Binding CanvasWidth}"
+							Height="{Binding CanvasHeight}"
+								HorizontalAlignment="Left"
+								VerticalAlignment="Top"
+								RenderTransformOrigin="0,0"
+								Background="#1A1A1A">
+					<Canvas.RenderTransform>
+						<TransformGroup>
+							<ScaleTransform ScaleX="{Binding Zoom}"
+															ScaleY="{Binding Zoom}" />
+							<TranslateTransform X="{Binding OffsetX}"
+																	Y="{Binding OffsetY}" />
+						</TransformGroup>
+					</Canvas.RenderTransform>
+
+					<ItemsControl ItemsSource="{Binding Relationships}"
+									Width="{Binding CanvasWidth}"
+									Height="{Binding CanvasHeight}"
+									IsHitTestVisible="False">
+						<ItemsControl.ItemsPanel>
+							<ItemsPanelTemplate>
+								<Canvas />
+							</ItemsPanelTemplate>
+						</ItemsControl.ItemsPanel>
+						<ItemsControl.ItemTemplate>
+							<DataTemplate>
+								<Line Stroke="#5DADEC"
+										StrokeThickness="2"
+										Opacity="0.9">
+									<Line.StartPoint>
+										<MultiBinding Converter="{StaticResource NodeCenterConverter}">
+											<Binding Path="From.CenterX" />
+											<Binding Path="From.CenterY" />
+										</MultiBinding>
+									</Line.StartPoint>
+									<Line.EndPoint>
+										<MultiBinding Converter="{StaticResource NodeCenterConverter}">
+											<Binding Path="To.CenterX" />
+											<Binding Path="To.CenterY" />
+										</MultiBinding>
+									</Line.EndPoint>
+								</Line>
+							</DataTemplate>
+						</ItemsControl.ItemTemplate>
+					</ItemsControl>
+
+					<ItemsControl ItemsSource="{Binding Tables}"
+									Width="{Binding CanvasWidth}"
+									Height="{Binding CanvasHeight}">
+						<ItemsControl.ItemsPanel>
+							<ItemsPanelTemplate>
+								<Canvas />
+							</ItemsPanelTemplate>
+						</ItemsControl.ItemsPanel>
+						<ItemsControl.Styles>
+							<Style Selector="ContentPresenter">
+								<Setter Property="Canvas.Left" Value="{Binding X}" />
+								<Setter Property="Canvas.Top" Value="{Binding Y}" />
+							</Style>
+						</ItemsControl.Styles>
+						<ItemsControl.ItemTemplate>
+							<DataTemplate>
+								<Border Canvas.Left="{Binding X}"
+											Canvas.Top="{Binding Y}"
+											Width="{Binding Width}"
+											CornerRadius="6"
+											Margin="4"
+											Classes="table-node"
+											Background="{Binding IsSelected, Converter={StaticResource TableSelectedBrushConverter}}"
+											BorderBrush="#6C7086"
+											BorderThickness="1"
+											PointerPressed="OnNodePointerPressed"
+											PointerMoved="OnNodePointerMoved"
+											PointerReleased="OnNodePointerReleased"
+											SizeChanged="OnNodeSizeChanged">
+									<Border.Effect>
+										<DropShadowEffect BlurRadius="8"
+															Opacity="0.45"
+															OffsetX="3"
+															OffsetY="3"
+															Color="#000000" />
+									</Border.Effect>
+									<Grid RowDefinitions="Auto,*" ColumnDefinitions="*">
+										<DockPanel Grid.Row="0" Margin="0,0,0,4">
+											<Border Width="4"
+													Margin="0,0,6,0"
+													Background="{Binding Schema, Converter={StaticResource SchemaToBrushConverter}}" />
+											<TextBlock Text="{Binding DisplayName}"
+														FontWeight="Bold"
+														Foreground="#E2E8F0"
+														FontSize="13" />
+										</DockPanel>
+										<ItemsControl Grid.Row="1"
+														ItemsSource="{Binding Columns}"
+														Padding="4">
+											<ItemsControl.ItemTemplate>
+												<DataTemplate>
+													<Grid ColumnDefinitions="Auto,*,Auto" Margin="0,2" ColumnSpacing="6">
+														<StackPanel Grid.Column="0"
+																	Orientation="Horizontal"
+																	Spacing="4"
+																	VerticalAlignment="Center">
+															<Border Background="#3B82F6"
+																	CornerRadius="4"
+																	Padding="6,2"
+																	IsVisible="{Binding IsPrimaryKey}">
+																<TextBlock Text="PK"
+																			FontSize="11"
+																			Foreground="White" />
+															</Border>
+															<Border Background="#EF4444"
+																	CornerRadius="4"
+																	Padding="6,2"
+																	IsVisible="{Binding IsForeignKey}">
+																<TextBlock Text="FK"
+																			FontSize="11"
+																			Foreground="White" />
+															</Border>
+														</StackPanel>
+														<TextBlock Grid.Column="1"
+																	Text="{Binding Name}"
+																	Foreground="#CBD5F5"
+																	FontSize="12"
+																	TextTrimming="CharacterEllipsis"
+																	VerticalAlignment="Center" />
+														<TextBlock Grid.Column="2"
+																	Text="{Binding DataType}"
+																	Foreground="#94A3B8"
+																	FontSize="12"
+																	TextTrimming="CharacterEllipsis"
+																	VerticalAlignment="Center"
+																	HorizontalAlignment="Right" />
+													</Grid>
+												</DataTemplate>
+											</ItemsControl.ItemTemplate>
+										</ItemsControl>
+									</Grid>
+								</Border>
+							</DataTemplate>
+						</ItemsControl.ItemTemplate>
+					</ItemsControl>
+				</Canvas>
+			</Grid>
+		</Border>
+
+	</Grid>
+</UserControl>
